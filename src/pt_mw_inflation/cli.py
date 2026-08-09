@@ -6,8 +6,13 @@ from pathlib import Path
 
 import typer
 
+from pt_mw_inflation.data.dgert import parse_minimum_wage_history
 from pt_mw_inflation.data.eurostat import fetch_portugal_hicp, save_frame
 from pt_mw_inflation.data.registry import download_registry
+from pt_mw_inflation.processing.minimum_wage import (
+    build_statutory_panel,
+    find_unexplained_jumps,
+)
 
 app = typer.Typer(help="Portugal minimum-wage inflation research pipeline.")
 data_app = typer.Typer(help="Download raw public data.")
@@ -44,6 +49,41 @@ def eurostat_hicp(
     frame = fetch_portugal_hicp(geo=geo)
     save_frame(frame, root / output)
     typer.echo(f"Saved {len(frame):,} observations to {output}")
+
+
+@build_app.command("minimum-wage")
+def build_minimum_wage(
+    source: Path = typer.Option(
+        Path("data/raw/dgert/minimum_wage_history.html"),
+        help="Raw DGERT history previously retrieved by 'data download-sources'.",
+    ),
+    output: Path = typer.Option(
+        Path("data/processed/minimum_wage_policy.parquet"), help="Output Parquet path."
+    ),
+) -> None:
+    """Build the statutory minimum-wage panel from the retrieved DGERT history."""
+    root = _repo_root()
+    raw = root / source
+    if not raw.exists():
+        raise typer.BadParameter(f"{source} not found; run 'ptmw data download-sources' first")
+
+    changes = parse_minimum_wage_history(raw.read_bytes().decode("utf-8"))
+    panel = build_statutory_panel(changes)
+
+    destination = root / output
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    panel.to_parquet(destination, index=False)
+
+    typer.echo(f"Wrote {len(panel):,} statutory regimes to {output}")
+    for scope, count in panel["scope"].value_counts().sort_index().items():
+        typer.echo(f"  {scope}: {count} acts")
+
+    unexplained = find_unexplained_jumps(changes)
+    for scope, effective in unexplained:
+        typer.echo(
+            f"  incomplete upstream history: {scope} {effective} states an increase "
+            "that does not reconcile with the previous listed act"
+        )
 
 
 @build_app.command("macro")
