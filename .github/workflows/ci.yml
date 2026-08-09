@@ -17,7 +17,6 @@ permissions:
 
 env:
   POETRY_VERSION: "2.2.1"
-  # Processing and analysis code must never touch the network in CI.
   PYTHONHASHSEED: "0"
 
 jobs:
@@ -25,16 +24,14 @@ jobs:
     name: Lint (ruff)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
+      # Poetry is installed before setup-python so that `cache: poetry` can
+      # find the lock file and resolve the virtualenv path.
       - name: Install Poetry
         run: pipx install poetry==${{ env.POETRY_VERSION }}
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: poetry
@@ -52,16 +49,12 @@ jobs:
     name: Type check (mypy strict)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+      - uses: actions/checkout@v7
 
       - name: Install Poetry
         run: pipx install poetry==${{ env.POETRY_VERSION }}
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: poetry
@@ -80,16 +73,12 @@ jobs:
       matrix:
         python-version: ["3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
+      - uses: actions/checkout@v7
 
       - name: Install Poetry
         run: pipx install poetry==${{ env.POETRY_VERSION }}
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: poetry
@@ -102,7 +91,7 @@ jobs:
 
       - name: Upload coverage artifact
         if: matrix.python-version == '3.12'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-xml
           path: coverage.xml
@@ -112,14 +101,14 @@ jobs:
     name: Build package
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+      - uses: actions/checkout@v7
 
       - name: Install Poetry
         run: pipx install poetry==${{ env.POETRY_VERSION }}
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
 
       - name: Check pyproject and lock file are consistent
         run: poetry check --lock
@@ -128,7 +117,7 @@ jobs:
         run: poetry build
 
       - name: Upload distributions
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
