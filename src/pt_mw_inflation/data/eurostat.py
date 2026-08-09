@@ -121,6 +121,9 @@ def fetch_minimum_wage(geo: str = "PT", currency: str = "NAC") -> pd.DataFrame:
         monthly statutory level after removing the twelve-month convention.
     """
     frame = fetch_dataset("earn_mw_cur", {"geo": geo, "currency": currency})
+    # Observations are bi-annual, labelled like "2024-S1"; the calendar year is
+    # what the annual series joins on.
+    frame["year"] = frame["time"].astype(str).str.slice(0, 4).astype(int)
     if geo == "PT":
         frame["implied_monthly_statutory_eur"] = frame["value"] * (
             EUROSTAT_MONTHS_PER_YEAR / PORTUGUESE_PAYMENTS_PER_YEAR
