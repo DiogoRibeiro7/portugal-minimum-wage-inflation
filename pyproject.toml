@@ -54,10 +54,10 @@ ptmw = "pt_mw_inflation.cli:app"
 packages = [{ include = "pt_mw_inflation", from = "src" }]
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.4"
-pytest-cov = "^6.2"
-mypy = "^1.16"
-ruff = "^0.12"
+pytest = "^9.1"
+pytest-cov = "^7.1"
+mypy = "^2.3"
+ruff = "^0.16"
 pre-commit = "^4.2"
 types-requests = "^2.32"
 types-PyYAML = "^6.0"
