@@ -1,2 +1,104 @@
-\section{Results}
-% Generated results and publication-ready text will be added after the empirical pipeline is validated.
+\section{Long-run evidence}
+\label{sec:results}
+
+\input{tables/headline_macros}
+
+This section reports the historical accounting layer. It is descriptive. It
+documents what the statutory wage did relative to a productivity-and-inflation
+benchmark, and motivates the identification strategy; it is not itself evidence
+of a causal effect of minimum wages on prices.
+
+\subsection{The benchmark and the residual}
+
+For year $t$ the benchmark nominal wage growth compounds productivity growth
+with the previous year's inflation,
+%
+\begin{equation}
+  g^{\text{benchmark}}_{t} = (1 + g^{A}_{t})(1 + \pi_{t-1}) - 1,
+  \qquad
+  r_{t} = g^{MW}_{t} - g^{\text{benchmark}}_{t},
+  \label{eq:residual}
+\end{equation}
+%
+where $r_t$ is the policy residual. The benchmark compounds rather than adds.
+The distinction is immaterial at recent inflation rates and is not immaterial
+over the sample: with inflation near thirty per cent, as in the early 1980s, the
+additive approximation understates the benchmark by more than a percentage
+point, which exceeds most of the residuals being measured.
+
+\subsection{The wage floor against productivity}
+
+Figure~\ref{fig:real-wage-productivity} indexes the real minimum wage and output
+per worker to \MacroFirstYear{}. Over the \ObservedYears{} years to
+\MacroLastYear{}, productivity reached \ProductivityIndexEnd{} while the real
+minimum wage reached \RealWageIndexEnd{}.
+
+The divergence is the central historical fact. The real value of the wage floor
+fell sharply through the inflation of the late 1970s and early 1980s and did not
+regain its \MacroFirstYear{} level for four decades. Measured against
+productivity, the ratio bottomed at \WageToProductivityMin{} in
+\WageToProductivityMinYear{} and stood at \WageToProductivityEnd{} at the end of
+the sample: the minimum wage buys a far smaller share of what an average worker
+produces than it did when it was introduced.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.92\textwidth]{figures/real_wage_productivity.pdf}
+  \caption{Real minimum wage and labour productivity, indexed to
+  \MacroFirstYear{}. Both series are on one axis; productivity is real GDP per
+  person employed.}
+  \label{fig:real-wage-productivity}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.92\textwidth]{figures/wage_to_productivity.pdf}
+  \caption{The real minimum wage per unit of labour productivity, indexed to
+  \MacroFirstYear{}.}
+  \label{fig:wage-to-productivity}
+\end{figure}
+
+\subsection{The residual by regime}
+
+Averaged over the sample the residual is \MeanResidualPct{} percentage points a
+year, and cumulates to \CumulativeResidualPct{} points. The average conceals a
+reversal, and Table~\ref{tab:regimes} shows it.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Annual averages by policy regime, in per cent. $\pi$ is consumer
+  price inflation, $g_A$ productivity growth, $g_{MW}$ statutory minimum-wage
+  growth, and the residual is defined in equation~\eqref{eq:residual}.}
+  \label{tab:regimes}
+  \input{tables/regime_summary}
+\end{table}
+
+Three periods stand out. Through the revolutionary transition and its aftermath
+the statutory wage rose quickly in nominal terms and yet fell far behind a
+benchmark driven by inflation above twenty per cent a year; the residual is
+strongly negative and the real wage floor lost roughly a third of its value.
+From the late 1990s the residual is close to zero: the wage floor broadly
+tracked productivity and prices. From 2015 the sign reverses, and the residual
+turns persistently positive, which is the policy shift the identification
+strategy is designed to exploit.
+
+Figure~\ref{fig:policy-residual} plots the annual series.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.92\textwidth]{figures/policy_residual.pdf}
+  \caption{Annual policy residual: statutory minimum-wage growth less
+  productivity growth compounded with prior inflation.}
+  \label{fig:policy-residual}
+\end{figure}
+
+\subsection{What this does not establish}
+
+The residual is an accounting object. A positive residual means the wage floor
+rose faster than the benchmark; it does not mean the increase was inflationary,
+and the correlation between the residual and subsequent inflation cannot settle
+the question, because statutory changes respond to the same conditions that
+drive prices. That is precisely why the causal layer uses predetermined exposure
+and panel variation rather than the national time series, and why no
+pass-through estimate is reported until the regional coverage data required by
+that design is available.

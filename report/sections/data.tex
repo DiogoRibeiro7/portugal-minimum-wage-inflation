@@ -1,2 +1,77 @@
 \section{Data}
-% Generated results and publication-ready text will be added after the empirical pipeline is validated.
+\label{sec:data}
+
+All series are retrieved programmatically, checksummed, and rebuilt from raw
+inputs. No value in this paper is typed by hand: every number in the text is a
+macro generated from the analysis dataset, and every table and figure is written
+by the pipeline that produced it.
+
+\subsection{Statutory minimum wage}
+
+The statutory series is parsed from the official history published by the
+Direção-Geral do Emprego e das Relações de Trabalho (DGERT), which lists one row
+per legal act with its effective date and the value it set. The series begins
+with Decreto-Lei n.º 217/74 of 27 May 1974, which introduced a minimum wage of
+3\,300 escudos, and runs to the present.
+
+Portugal did not have a single minimum wage until 2005. Up to 1991 three
+legally distinct wages coexisted --- domestic service, agriculture, and a general
+regime covering the remaining activities --- falling to two between 1992 and 2004.
+The general regime is the series conventionally quoted as the Portuguese minimum
+wage, and it is the one used throughout. The special regimes were always set at
+or below it, which the pipeline asserts on every date where regimes coexist.
+
+Escudo amounts are converted at 200.482 escudos per euro, the irrevocable rate
+fixed for the changeover. The act effective in January 2002 states both
+currencies, and its published euro figure is preferred over the converted one.
+
+Two independent checks validate the parsed series. First, the provider states
+each act's percentage increase over the wage it replaced; recomputing that from
+consecutive parsed values reconciles amounts, ordering, and regime assignment
+simultaneously. Second, Eurostat compiles the same statutory wage from its own
+reading of national law. Eurostat expresses it on a twelve-month basis whereas
+Portuguese law states a monthly wage paid fourteen times a year, so its figure
+equals the monthly level times $14/12$; undoing that convention reproduces the
+parsed series to within a euro across the years checked.
+
+The reconciliation exposes one gap in the national source: the act effective in
+2000 is absent from the published history, while the 2001 entries still state
+their increase relative to it. Because a year with no listed act is otherwise
+indistinguishable from a year in which the wage was genuinely frozen --- as it was
+in 2012 and 2013 --- the pipeline resolves the ambiguity against Eurostat, and
+uses the Eurostat level only where the two compilers materially disagree. The
+2000 observation is therefore attributed to Eurostat rather than to the national
+legal source, and is flagged as such in the dataset.
+
+\subsection{Prices and productivity}
+
+Consumer prices are the World Bank index for Portugal, available from 1960.
+Eurostat's harmonised index begins in 1996, two decades after the minimum wage
+was introduced, and would truncate the historical layer at the point where it is
+least informative.
+
+Labour productivity is real gross domestic product per person employed from the
+European Commission AMECO database (series \texttt{PRT.1.1.0.0.RVGDE}),
+available from 1960. The Eurostat national-accounts equivalent begins in 1995
+for Portugal. Over the 31 years in which the two overlap they are effectively
+the same series: their annual growth rates correlate at unity and differ by at
+most 0.003 percentage points. AMECO carries Commission projections beyond the
+last outturn, which are excluded; only observed years enter the dataset.
+
+\subsection{Coverage and exposure}
+
+The exposure design requires the pre-existing share of workers paid at the
+minimum wage, by region and industry. The Gabinete de Estratégia e Planeamento
+(GEP) published these statistics, but has since withdrawn the host: every path
+under its former domain now answers with an unrelated landing page. The
+publications are retrieved instead from the Internet Archive and are registered
+with their archival addresses and checksums, so the citation remains verifiable.
+
+The recovered monitoring reports give coverage by economic activity. They do not
+give a systematic breakdown by NUTS II region, which the identification strategy
+in Section~\ref{sec:methods} requires. Constructing a region-by-industry measure
+from these sources would require assuming that within-industry coverage does not
+vary across regions, so that all regional variation comes from industry mix.
+That assumption is not innocuous in a country whose regions differ sharply in
+tourism intensity, and it is not made here. The price pass-through estimates are
+therefore not reported in this version.
