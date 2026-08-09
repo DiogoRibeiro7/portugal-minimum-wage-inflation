@@ -1,21 +1,55 @@
+# Registry of external research sources.
+#
+# Every entry records the provider, the canonical URL, the redistribution terms,
+# and the date the URL was last confirmed to serve the expected payload.
+# Downloads verify the media type, so a provider that answers 200 with a
+# redirect to a landing page fails loudly instead of writing an HTML error page
+# under a data file name.
+#
+# Sources that a provider has withdrawn stay here with `enabled: false` and a
+# stated reason: the citation remains part of the research record even when the
+# file can no longer be retrieved.
+
 sources:
   dgert_minimum_wage:
     provider: DGERT
     kind: html
     url: "https://www.dgert.gov.pt/evolucao-da-remuneracao-minima-mensal-garantida-rmmg"
     destination: "data/raw/dgert/minimum_wage_history.html"
-    description: "Official history of the Portuguese guaranteed minimum monthly remuneration."
-
-  gep_2013_bulletin_xlsx:
-    provider: GEP/MTSSS
-    kind: xlsx
-    url: "https://www.gep.mtsss.gov.pt/documents/10182/10925/bemar2013.xlsx/ca273b69-dda7-4c13-9c18-1703d580fdc3"
-    destination: "data/raw/gep/bulletin_2013_03.xlsx"
-    description: "Historical labour-market bulletin with minimum-wage and regional/sectoral tables."
+    description: >-
+      Official history of the guaranteed minimum monthly remuneration (RMMG),
+      one row per legal act from Decreto-Lei 217/74 onwards, with the effective
+      date and the value for each statutory regime.
+    licence: "Portuguese public-sector information; attribution required."
+    verified_on: 2026-08-09
+    minimum_bytes: 50000
 
   eurostat_hicp_metadata:
     provider: Eurostat
     kind: html
     url: "https://ec.europa.eu/eurostat/cache/metadata/en/prc_hicp_esms.htm"
     destination: "data/raw/eurostat/hicp_metadata.html"
-    description: "HICP metadata and classification information."
+    description: >-
+      HICP reference metadata: coverage, classification and the treatment of
+      index rebasing, needed to document the price panel.
+    licence: "Eurostat reuse policy, attribution required."
+    verified_on: 2026-08-09
+    minimum_bytes: 50000
+
+  gep_2013_bulletin_xlsx:
+    provider: GEP/MTSSS
+    kind: xlsx
+    url: "https://www.gep.mtsss.gov.pt/documents/10182/10925/bemar2013.xlsx/ca273b69-dda7-4c13-9c18-1703d580fdc3"
+    destination: "data/raw/gep/bulletin_2013_03.xlsx"
+    description: >-
+      Labour-market bulletin carrying minimum-wage coverage by NUTS II region
+      and economic activity. Primary input for the exposure panel.
+    licence: "Portuguese public-sector information; attribution required."
+    enabled: false
+    unavailable_reason: >-
+      Withdrawn by the provider. As of 2026-08-09 the whole gep.mtsss.gov.pt
+      host redirects to https://www.dgcp.mtsss.gov.pt/inicio and answers 200
+      with HTML for every path, so the request succeeds while returning a
+      landing page rather than the workbook. No replacement location for the
+      RMMG coverage tables has been identified; the exposure panel cannot be
+      built until one is.
