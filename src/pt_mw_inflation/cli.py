@@ -27,7 +27,9 @@ def download_sources() -> None:
     """Download every source currently listed in config/sources.yaml."""
     root = _repo_root()
     records = download_registry(root / "config/sources.yaml", root)
-    typer.echo(f"Downloaded {len(records)} sources; manifest written to data/raw/source_manifest.json")
+    typer.echo(
+        f"Downloaded {len(records)} sources; manifest written to data/raw/source_manifest.json"
+    )
 
 
 @data_app.command("eurostat-hicp")

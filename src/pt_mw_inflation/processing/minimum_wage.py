@@ -31,11 +31,9 @@ def build_policy_residual(frame: pd.DataFrame, inflation_lag: int = 1) -> pd.Dat
     result = frame.sort_values("year").copy()
     result["minimum_wage_growth"] = result["minimum_wage"].pct_change()
     result["lagged_inflation"] = result["inflation"].shift(inflation_lag)
-    result["benchmark_wage_growth"] = (
-        (1.0 + result["productivity_growth"]) * (1.0 + result["lagged_inflation"]) - 1.0
-    )
-    result["policy_residual"] = (
-        result["minimum_wage_growth"] - result["benchmark_wage_growth"]
-    )
+    result["benchmark_wage_growth"] = (1.0 + result["productivity_growth"]) * (
+        1.0 + result["lagged_inflation"]
+    ) - 1.0
+    result["policy_residual"] = result["minimum_wage_growth"] - result["benchmark_wage_growth"]
     result["log_minimum_wage_growth"] = np.log(result["minimum_wage"]).diff()
     return result

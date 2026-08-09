@@ -9,9 +9,7 @@ from typing import Any
 import pandas as pd
 import requests
 
-EUROSTAT_STATISTICS_API = (
-    "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data"
-)
+EUROSTAT_STATISTICS_API = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data"
 
 
 def _ordered_categories(dimension: dict[str, Any]) -> list[str]:
@@ -36,7 +34,7 @@ def jsonstat_to_frame(payload: dict[str, Any]) -> pd.DataFrame:
 
     raw_values = payload.get("value", {})
     if isinstance(raw_values, list):
-        values: dict[int, float | None] = {i: value for i, value in enumerate(raw_values)}
+        values: dict[int, float | None] = dict(enumerate(raw_values))
     elif isinstance(raw_values, dict):
         values = {int(i): value for i, value in raw_values.items()}
     else:
@@ -49,7 +47,7 @@ def jsonstat_to_frame(payload: dict[str, Any]) -> pd.DataFrame:
         value = values.get(flat_index)
         if value is None:
             continue
-        row = dict(zip(dimensions, coordinates, strict=True))
+        row: dict[str, object] = dict(zip(dimensions, coordinates, strict=True))
         row["value"] = float(value)
         rows.append(row)
 

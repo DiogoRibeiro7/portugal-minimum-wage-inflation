@@ -36,15 +36,12 @@ def construct_cost_exposure(
     merged = bite.merge(labour_share, on="industry", validate="many_to_one")
     merged = merged.merge(consumption_bridge, on="industry", validate="many_to_many")
     merged["component_exposure"] = (
-        merged["minimum_wage_bite"]
-        * merged["labour_cost_share"]
-        * merged["production_weight"]
+        merged["minimum_wage_bite"] * merged["labour_cost_share"] * merged["production_weight"]
     )
 
-    return (
-        merged.groupby(["region", "category", "reference_period"], as_index=False)[
-            "component_exposure"
-        ]
-        .sum()
-        .rename(columns={"component_exposure": "cost_exposure"})
-    )
+    # Select with a list, not a bare label, so the aggregation stays a DataFrame.
+    aggregated = merged.groupby(["region", "category", "reference_period"], as_index=False)[
+        ["component_exposure"]
+    ].sum()
+
+    return aggregated.rename(columns={"component_exposure": "cost_exposure"})
