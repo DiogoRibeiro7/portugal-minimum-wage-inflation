@@ -36,20 +36,90 @@ sources:
     verified_on: 2026-08-09
     minimum_bytes: 50000
 
+  ameco_domestic_product:
+    provider: European Commission (DG ECFIN)
+    kind: zip
+    url: "https://ec.europa.eu/economy_finance/db_indicators/ameco/documents/ameco6.zip"
+    destination: "data/raw/ameco/domestic_product.zip"
+    description: >-
+      AMECO chapter 6. Supplies real GDP per person employed for Portugal from
+      1960, series PRT.1.1.0.0.RVGDE. Used for productivity because Eurostat's
+      national-accounts series begins only in 1995 for Portugal, which would
+      truncate the historical layer two decades after the minimum wage was
+      introduced. Commission projections beyond the last outturn are excluded
+      at build time.
+    licence: "European Commission reuse policy, attribution required."
+    verified_on: 2026-08-09
+    minimum_bytes: 100000
+
+  worldbank_consumer_prices:
+    provider: World Bank
+    kind: json
+    url: "https://api.worldbank.org/v2/country/PRT/indicator/FP.CPI.TOTL?format=json&per_page=500"
+    destination: "data/raw/worldbank/portugal_cpi.json"
+    description: >-
+      Portuguese consumer price index from 1960, indicator FP.CPI.TOTL. Used
+      for the long-run deflator because Eurostat's HICP for Portugal begins in
+      1996.
+    licence: "CC BY 4.0 (World Bank open data)."
+    verified_on: 2026-08-09
+    minimum_bytes: 2000
+
+  eurostat_minimum_wage:
+    provider: Eurostat
+    kind: json
+    url: "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/earn_mw_cur?format=JSON&lang=EN&geo=PT&currency=NAC"
+    destination: "data/raw/eurostat/minimum_wage.json"
+    description: >-
+      Bi-annual statutory minimum wage for Portugal, compiled independently of
+      the national legal history. Used to cross-validate the parsed DGERT
+      series, and to supply the level for years whose act is missing from the
+      national page. Eurostat spreads the fourteen statutory payments over
+      twelve months, so its figure is the monthly level times 14/12.
+    licence: "Eurostat reuse policy, attribution required."
+    verified_on: 2026-08-09
+    minimum_bytes: 2000
+
+  gep_rmmg_report_10:
+    provider: GEP/MTSSS (via Internet Archive)
+    kind: pdf
+    url: "http://web.archive.org/web/2018id_/http://www.gep.mtsss.gov.pt/documents/10182/75953/rmmg_10_relatorio.pdf/d8e0d29c-e1de-4c3b-9a1d-942c228ee1ce"
+    destination: "data/raw/gep/rmmg_report_10.pdf"
+    description: >-
+      Tenth monitoring report on the guaranteed minimum monthly wage agreement,
+      November 2018. Carries coverage of the minimum wage by economic activity.
+      Retrieved from the Internet Archive because the provider withdrew the
+      host; see the note below.
+    licence: "Portuguese public-sector information; attribution required."
+    verified_on: 2026-08-09
+    minimum_bytes: 500000
+
+  gep_quadros_de_pessoal_series:
+    provider: GEP/MTSSS (via Internet Archive)
+    kind: xlsx
+    url: "http://web.archive.org/web/20180719160346id_/http://www.gep.mtsss.gov.pt/estatistica/empresas/seriesqp_1999_2009.xlsx"
+    destination: "data/raw/gep/quadros_de_pessoal_1999_2009.xlsx"
+    description: >-
+      Quadros de Pessoal series 1999-2009: employees and average base pay by
+      economic activity and by district. Supplies the industry employment
+      weights the exposure bridge needs. Retrieved from the Internet Archive.
+    licence: "Portuguese public-sector information; attribution required."
+    verified_on: 2026-08-09
+    minimum_bytes: 100000
+
   gep_2013_bulletin_xlsx:
     provider: GEP/MTSSS
     kind: xlsx
     url: "https://www.gep.mtsss.gov.pt/documents/10182/10925/bemar2013.xlsx/ca273b69-dda7-4c13-9c18-1703d580fdc3"
     destination: "data/raw/gep/bulletin_2013_03.xlsx"
     description: >-
-      Labour-market bulletin carrying minimum-wage coverage by NUTS II region
-      and economic activity. Primary input for the exposure panel.
+      Labour-market bulletin carrying minimum-wage statistics. Superseded by
+      the archived copies registered above, which are retrievable.
     licence: "Portuguese public-sector information; attribution required."
     enabled: false
     unavailable_reason: >-
-      Withdrawn by the provider. As of 2026-08-09 the whole gep.mtsss.gov.pt
-      host redirects to https://www.dgcp.mtsss.gov.pt/inicio and answers 200
-      with HTML for every path, so the request succeeds while returning a
-      landing page rather than the workbook. No replacement location for the
-      RMMG coverage tables has been identified; the exposure panel cannot be
-      built until one is.
+      Withdrawn by the provider at its live address. As of 2026-08-09 the whole
+      gep.mtsss.gov.pt host redirects to https://www.dgcp.mtsss.gov.pt/inicio
+      and answers 200 with HTML for every path, so the request succeeds while
+      returning a landing page rather than the workbook. The entry is retained
+      for the citation; the archived copies registered above are used instead.

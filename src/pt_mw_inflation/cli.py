@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import typer
@@ -10,12 +11,24 @@ import yaml
 
 from pt_mw_inflation.analysis.falsification import run_pre_trend_diagnostic
 from pt_mw_inflation.analysis.local_projections import estimate_panel_local_projections
+from pt_mw_inflation.analysis.outputs import generate_macro_outputs
+from pt_mw_inflation.data.ameco import fetch_series as fetch_ameco_series
+from pt_mw_inflation.data.ameco import to_frame as ameco_to_frame
 from pt_mw_inflation.data.dgert import parse_minimum_wage_history
+from pt_mw_inflation.data.eurostat import fetch_minimum_wage as fetch_eurostat_minimum_wage
 from pt_mw_inflation.data.eurostat import fetch_portugal_hicp, save_frame
 from pt_mw_inflation.data.registry import download_registry
+from pt_mw_inflation.data.worldbank import fetch_indicator
+from pt_mw_inflation.processing.macro import (
+    build_macro_annual,
+    check_accounting_identities,
+    summarise_by_regime,
+)
 from pt_mw_inflation.processing.minimum_wage import (
+    annual_minimum_wage,
     build_statutory_panel,
     find_unexplained_jumps,
+    reconcile_annual_with_eurostat,
 )
 
 app = typer.Typer(help="Portugal minimum-wage inflation research pipeline.")
@@ -90,13 +103,71 @@ def build_minimum_wage(
         )
 
 
+def _load_settings(root: Path) -> dict[str, Any]:
+    """Read the analysis configuration."""
+    loaded = yaml.safe_load((root / "config/analysis.yaml").read_text(encoding="utf-8"))
+    return dict(loaded or {})
+
+
 @build_app.command("macro")
-def build_macro() -> None:
-    """Explain the expected macro build inputs until all source adapters are populated."""
-    typer.echo(
-        "Macro build contract: year, minimum_wage, inflation, productivity_growth. "
-        "Populate adapters for DGERT/INE/AMECO, then write data/processed/macro_annual.parquet."
+def build_macro(
+    source: Path = typer.Option(
+        Path("data/raw/dgert/minimum_wage_history.html"),
+        help="Raw DGERT history previously retrieved by 'data download-sources'.",
+    ),
+    output: Path = typer.Option(
+        Path("data/processed/macro_annual.parquet"), help="Output Parquet path."
+    ),
+) -> None:
+    """Build the long-run annual macro dataset from wages, prices and productivity.
+
+    Prices come from the World Bank consumer price index and productivity from
+    AMECO, because both reach back to the introduction of the minimum wage in
+    1974, where Eurostat's national-accounts series would begin only in 1995.
+    """
+    root = _repo_root()
+    settings = _load_settings(root)
+    macro_settings = settings.get("macro", {})
+
+    raw = root / source
+    if not raw.exists():
+        raise typer.BadParameter(f"{source} not found; run 'ptmw data download-sources' first")
+
+    panel = build_statutory_panel(parse_minimum_wage_history(raw.read_bytes().decode("utf-8")))
+    wages = reconcile_annual_with_eurostat(
+        annual_minimum_wage(panel, scope="general"), fetch_eurostat_minimum_wage()
     )
+    corrected = wages.loc[wages["minimum_wage_source"] != "DGERT statutory history", "year"]
+    for year in corrected:
+        typer.echo(
+            f"  {int(year)}: act absent from the national history; level taken from Eurostat"
+        )
+
+    prices = fetch_indicator()
+    productivity = ameco_to_frame(
+        fetch_ameco_series(), last_actual_year=int(macro_settings["last_actual_year"])
+    )
+
+    macro = build_macro_annual(
+        wages,
+        prices,
+        productivity,
+        start_year=int(macro_settings.get("start_year", 1974)),
+        end_year=int(macro_settings["last_actual_year"]),
+        inflation_lag=int(macro_settings.get("benchmark_inflation_lag", 1)),
+    )
+    check_accounting_identities(macro)
+
+    destination = root / output
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    macro.to_parquet(destination, index=False)
+
+    typer.echo(
+        f"Wrote {len(macro)} years ({int(macro['year'].min())}-{int(macro['year'].max())}) "
+        f"to {output}"
+    )
+    residual = macro["policy_residual"].dropna()
+    typer.echo(f"  mean policy residual: {residual.mean() * 100:+.2f} pp per year")
 
 
 @build_app.command("policy-residual")
@@ -106,9 +177,32 @@ def build_policy_residual_command() -> None:
 
 
 @analyse_app.command("macro")
-def analyse_macro() -> None:
-    """Placeholder for the reproducible long-run tables and figures."""
-    typer.echo("Macro analysis module is available; connect it after macro data build.")
+def analyse_macro(
+    source: Path = typer.Option(
+        Path("data/processed/macro_annual.parquet"), help="Macro dataset to analyse."
+    ),
+) -> None:
+    """Generate every long-run figure and table from the macro dataset."""
+    root = _repo_root()
+    dataset = root / source
+    if not dataset.exists():
+        raise typer.BadParameter(f"{source} not found; run 'ptmw build macro' first")
+
+    macro = pd.read_parquet(dataset)
+    check_accounting_identities(macro)
+
+    settings = _load_settings(root)
+    regimes = summarise_by_regime(macro, list(settings["macro"]["regimes"]))
+
+    written = generate_macro_outputs(
+        macro,
+        regimes,
+        figures_dir=root / "report/figures",
+        tables_dir=root / "report/tables",
+    )
+    for path in written:
+        typer.echo(f"  wrote {path.relative_to(root)}")
+    typer.echo(f"Generated {len(written)} outputs from {len(macro)} years.")
 
 
 @analyse_app.command("pass-through")

@@ -47,6 +47,27 @@ was.
   baseline bite is frozen before each policy episode.
 - Synthetic panel generator with a known dynamic response, used to verify that
   the estimators recover the truth and that each falsification check fires.
+- Long-run annual macro dataset covering 1974 to 2025: statutory wage, consumer
+  prices, real productivity, the productivity-plus-lagged-inflation benchmark
+  and the policy residual, with the accounting identities checked on every
+  build.
+- AMECO adapter for real GDP per person employed from 1960, and a World Bank
+  adapter for the consumer price index from 1960. Both reach back to the
+  introduction of the minimum wage, where the Eurostat equivalents begin in
+  1995 and 1996.
+- Generated figures and LaTeX tables for the long-run layer, plus headline
+  quantities emitted as LaTeX macros so the manuscript cannot quote a number
+  the dataset does not produce.
+- Manuscript sections for data and long-run evidence, written entirely against
+  generated macros, and tests asserting that the prose cites no undefined
+  quantity and hard-codes no result.
+- `make paper`, which rebuilds the datasets, regenerates every output and
+  compiles the manuscript.
+- Withdrawn GEP publications restored from the Internet Archive and registered
+  with their archival addresses, so the exposure sources are retrievable again.
+- Reconciliation of the annual wage series against Eurostat, which fills years
+  whose act is missing from the national history and records the compiler each
+  observation came from.
 
 ### Changed
 

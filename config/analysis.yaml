@@ -1,5 +1,9 @@
 macro:
   start_year: 1974
+  # AMECO publishes Commission projections beyond the last observed year.
+  # Everything after this year is a forecast and is excluded from the dataset;
+  # raise it only when the corresponding year is an outturn.
+  last_actual_year: 2025
   benchmark_inflation_lag: 1
   use_exact_compounding: true
   regimes:
