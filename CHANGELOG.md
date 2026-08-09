@@ -16,6 +16,33 @@ was.
 
 - Concept and version DOIs from the first Zenodo deposit, recorded in
   `CITATION.cff` and as a README badge.
+- Statutory minimum-wage panel built from the official DGERT history: one row
+  per legal act, scope and effective date, covering 1974 to 2026 with the
+  citation of every act. Written to `data/processed/minimum_wage_policy.parquet`
+  by `ptmw build minimum-wage`.
+- Annual collapse of the statutory panel offering both the 1 January level and
+  the day-weighted average, which diverge in the eight years with a mid-year act.
+- Payload verification on download: a response whose media type contradicts the
+  declared source kind is rejected instead of being written under a data file
+  name.
+- Snapshot-on-change retrieval: a changed upstream file is retained under a
+  timestamped name rather than overwritten.
+- Registry validation for empty registries, duplicate destinations, and
+  withdrawn sources, which must state why they are unreachable.
+- Cross-validation against Eurostat's independently compiled minimum-wage
+  series, pinned in the test suite at five years.
+
+### Changed
+
+- Source registry records licence terms and a verification date per source.
+- Provenance manifest uses forward-slash paths, so it is byte-identical across
+  platforms for identical downloads.
+
+### Fixed
+
+- The registered GEP bulletin link is withdrawn upstream: the host now answers
+  200 with an HTML landing page for every path. It is disabled with a recorded
+  reason instead of silently storing that page as a spreadsheet.
 
 ## [0.2.0] - 2026-08-09
 
