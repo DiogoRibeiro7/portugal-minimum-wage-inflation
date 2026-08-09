@@ -1,4 +1,4 @@
-.PHONY: help install hooks format lint typecheck test coverage check clean
+.PHONY: help install hooks format lint typecheck test coverage check paper clean
 
 help:
 	@echo "install    Install dependencies from poetry.lock"
@@ -9,6 +9,7 @@ help:
 	@echo "test       pytest"
 	@echo "coverage   pytest with a terminal coverage report"
 	@echo "check      lint + typecheck + test (what CI runs)"
+	@echo "paper      Rebuild datasets, regenerate outputs, compile the manuscript"
 	@echo "clean      Remove caches and build artefacts"
 
 install:
@@ -35,6 +36,15 @@ coverage:
 	poetry run pytest --cov=pt_mw_inflation --cov-report=term-missing
 
 check: lint typecheck test
+
+# The manuscript imports generated figures and tables, so the data pipeline
+# has to run before LaTeX does.
+paper:
+	poetry run ptmw data download-sources
+	poetry run ptmw build minimum-wage
+	poetry run ptmw build macro
+	poetry run ptmw analyse macro
+	cd report && pdflatex -interaction=nonstopmode -halt-on-error main.tex
 
 clean:
 	rm -rf .pytest_cache .mypy_cache .ruff_cache htmlcov .coverage coverage.xml dist build
