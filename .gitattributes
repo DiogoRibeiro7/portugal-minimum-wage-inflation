@@ -1,0 +1,31 @@
+# Normalise line endings: LF in the repository, native in the working copy.
+* text=auto eol=lf
+
+# Files that must stay LF regardless of platform.
+*.py      text eol=lf
+*.tex     text eol=lf
+*.bib     text eol=lf
+*.md      text eol=lf
+*.yaml    text eol=lf
+*.yml     text eol=lf
+*.toml    text eol=lf
+*.cff     text eol=lf
+Makefile  text eol=lf
+
+# Data and binary artefacts: never touch the bytes, never diff as text.
+*.parquet binary
+*.xlsx    binary
+*.xls     binary
+*.zip     binary
+*.gz      binary
+*.pdf     binary
+*.png     binary
+*.jpg     binary
+*.csv     text eol=lf diff
+
+# Generated or vendored paths excluded from GitHub language statistics.
+notebooks/**       linguist-documentation
+report/**          linguist-documentation
+docs/**            linguist-documentation
+poetry.lock        linguist-generated -diff
+LICENSE-CC-BY-4.0.txt linguist-vendored

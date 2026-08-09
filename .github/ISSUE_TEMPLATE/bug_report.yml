@@ -1,0 +1,62 @@
+name: Bug report
+description: Something in the code does not work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        For a wrong *number* in a source series, use the **Data issue** template
+        instead. This one is for code that crashes or misbehaves.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you observe, and what did you expect instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: >-
+        The exact command or snippet. Minimal is better than complete.
+      render: shell
+      placeholder: poetry run ptmw build macro
+    validations:
+      required: true
+
+  - type: textarea
+    id: traceback
+    attributes:
+      label: Traceback or output
+      render: text
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: Commit or version
+      description: Output of `git rev-parse --short HEAD`.
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python version and OS
+      placeholder: "3.12.4, Ubuntu 24.04"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmations
+      options:
+        - label: I installed with `poetry install` and ran on a clean checkout.
+          required: true
+        - label: I searched existing issues for a duplicate.
+          required: true

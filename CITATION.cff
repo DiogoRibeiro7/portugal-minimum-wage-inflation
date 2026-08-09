@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+title: >-
+  Portugal Minimum Wage, Productivity and Inflation: a reproducible
+  exposure-based analysis
+message: >-
+  If you use this software or the accompanying analysis, please cite it using
+  the metadata below.
+type: software
+authors:
+  - given-names: Diogo
+    family-names: Ribeiro
+    email: diogo_dj@hotmail.com
+    # Add your ORCID once available:
+    # orcid: 'https://orcid.org/0000-0000-0000-0000'
+repository-code: 'https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation'
+abstract: >-
+  Reproducible research repository studying the interaction between Portugal's
+  statutory minimum wage, labour productivity, and consumer-price inflation from
+  the introduction of the national minimum wage in 1974 to the present. The
+  analysis combines long-run macro accounting with an exposure-based panel
+  local-projection design that links statutory wage shocks to the CPI/HICP
+  categories most exposed to minimum-wage labour costs.
+keywords:
+  - minimum wage
+  - inflation
+  - pass-through
+  - labour productivity
+  - Portugal
+  - local projections
+  - reproducible research
+license: MIT
+license-url: 'https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/blob/main/LICENSE'
+version: 0.1.0

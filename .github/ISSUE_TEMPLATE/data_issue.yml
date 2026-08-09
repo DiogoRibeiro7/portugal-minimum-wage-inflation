@@ -1,0 +1,56 @@
+name: Data issue
+description: A source series, value, code mapping, or URL is wrong or has moved.
+labels: ["data"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Data corrections are the highest-value contribution to this repository.
+        Please cite the primary source — a gazette, a legal act, or an official
+        statistical release — rather than a secondary summary.
+
+  - type: dropdown
+    id: source
+    attributes:
+      label: Which source
+      options:
+        - DGERT / national legislation (statutory minimum wage)
+        - Madeira or Azores regional gazette
+        - GEP / MTSSS (RMMG coverage)
+        - INE (CPI, national accounts, regional controls)
+        - Eurostat (HICP, weights, productivity)
+        - AMECO / European Commission
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong
+      description: >-
+        Identify the variable, the region or industry, and the period affected.
+      placeholder: >-
+        minimum_wage_monthly for 1986 is recorded as X; the Decreto-Lei sets it
+        at Y from 1 January 1986.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Primary source
+      description: >-
+        Link or citation, plus the page, article, or table where the correct
+        value appears.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Expected impact
+      description: >-
+        Which downstream datasets or estimates would change, if you know.
+    validations:
+      required: false

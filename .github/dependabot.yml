@@ -1,0 +1,43 @@
+version: 2
+
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: monthly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+    groups:
+      # The scientific stack moves together; one PR is easier to validate
+      # against the numerical tests than five separate ones.
+      scientific-stack:
+        patterns:
+          - "pandas*"
+          - "numpy"
+          - "scipy"
+          - "statsmodels"
+          - "linearmodels"
+          - "pyarrow"
+          - "matplotlib"
+      dev-tooling:
+        patterns:
+          - "ruff"
+          - "mypy"
+          - "pytest*"
+          - "pre-commit"
+          - "types-*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: "ci"

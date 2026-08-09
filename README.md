@@ -1,5 +1,12 @@
 # Portugal Minimum Wage Inflation
 
+[![CI](https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/actions/workflows/ci.yml/badge.svg)](https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/actions/workflows/ci.yml)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
+[![Code style: ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
+[![Checked with mypy](https://img.shields.io/badge/mypy-strict-2a6db2.svg)](https://mypy-lang.org/)
+[![License: MIT](https://img.shields.io/badge/code-MIT-green.svg)](LICENSE)
+[![License: CC BY 4.0](https://img.shields.io/badge/text-CC%20BY%204.0-lightgrey.svg)](LICENSE-CC-BY-4.0.txt)
+
 Reproducible research repository for studying the interaction between Portugal's statutory minimum wage, labour productivity, and consumer-price inflation from the introduction of the national minimum wage in 1974 to the present.
 
 The repository is designed around two complementary empirical layers:
@@ -73,6 +80,9 @@ Every downloaded file is retained under `data/raw/` with metadata and a checksum
 ## Repository layout
 
 ```text
+.github/
+  workflows/ci.yml       Lint, type check, tests, package build
+  ISSUE_TEMPLATE/        Bug, data-correction, and feature templates
 config/                  Source registry and analysis configuration
 data/
   raw/                   Immutable downloaded source files
@@ -104,6 +114,22 @@ Python 3.12 and Poetry are used for reproducibility.
 poetry install
 poetry run pre-commit install
 ```
+
+Dependencies are pinned in `poetry.lock`, which is committed. Install from the
+lock file rather than resolving fresh, so that a rerun years from now produces
+the same numbers.
+
+## Quality gates
+
+```bash
+make check       # everything below
+make lint        # ruff check + ruff format --check
+make typecheck   # mypy, strict, over src/
+make test        # pytest
+```
+
+The same three gates run in CI on every push and pull request, against Python
+3.12 and 3.13.
 
 ## Main commands
 
@@ -140,3 +166,35 @@ poetry run ptmw analyse pass-through
 ## Publication strategy
 
 The macro history is the context and validation layer. The publication claim should rest on the exposure-based price analysis, not on a raw national time-series correlation. See `docs/research_design.md` and `docs/literature_map.md`.
+
+## Contributing
+
+Data corrections are the most valuable contribution here: a wrong minimum-wage
+schedule or a misread gazette invalidates everything downstream. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and the reproducibility
+rules a pull request must respect, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+for expected conduct. Security reports go through
+[SECURITY.md](SECURITY.md), not public issues.
+
+Notable changes are recorded in [CHANGELOG.md](CHANGELOG.md). Any change that
+moves a published estimate is logged there with before/after values.
+
+## Citation
+
+If you use this repository, please cite it. GitHub renders `CITATION.cff` as a
+"Cite this repository" button; the same metadata is machine-readable for
+reference managers.
+
+## Licence
+
+Dual-licensed:
+
+- **Code** — `src/`, `tests/`, `notebooks/`, `config/`, `Makefile`, packaging
+  and tooling: [MIT](LICENSE).
+- **Written output** — `report/` and `docs/`, including the manuscript and
+  generated figures and tables:
+  [CC BY 4.0](LICENSE-CC-BY-4.0.txt).
+
+Third-party data downloaded into `data/` is covered by neither licence and
+remains subject to its original provider's terms. Per-source provenance and
+licensing are recorded in `config/sources.yaml` and `docs/data_dictionary.md`.

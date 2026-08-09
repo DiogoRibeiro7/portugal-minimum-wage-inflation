@@ -1,0 +1,42 @@
+name: Feature or analysis request
+description: Propose a new source adapter, specification, robustness check, or output.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What should exist
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why
+      description: >-
+        For an analysis request, say what it would establish that the current
+        design cannot. For a robustness check, say which threat to validity it
+        addresses.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Data acquisition
+        - Processing / exposure construction
+        - Estimation
+        - Robustness / inference
+        - Manuscript or documentation
+        - Tooling and CI
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false

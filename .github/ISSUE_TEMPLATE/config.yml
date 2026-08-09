@@ -1,0 +1,10 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Methodological discussion
+    url: https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/discussions
+    about: >-
+      Questions or challenges about the identification strategy, estimands, or
+      robustness. Read docs/research_design.md first.
+  - name: Security vulnerability
+    url: https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/security/advisories/new
+    about: Report privately. Do not open a public issue for a security problem.
