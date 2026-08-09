@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pandas as pd
 import typer
+import yaml
 
+from pt_mw_inflation.analysis.falsification import run_pre_trend_diagnostic
+from pt_mw_inflation.analysis.local_projections import estimate_panel_local_projections
 from pt_mw_inflation.data.dgert import parse_minimum_wage_history
 from pt_mw_inflation.data.eurostat import fetch_portugal_hicp, save_frame
 from pt_mw_inflation.data.registry import download_registry
@@ -108,9 +112,47 @@ def analyse_macro() -> None:
 
 
 @analyse_app.command("pass-through")
-def analyse_pass_through() -> None:
-    """Placeholder for exposure-based panel/local-projection estimation."""
-    typer.echo("Pass-through analysis requires the regional/category exposure panel.")
+def analyse_pass_through(
+    panel: Path = typer.Option(
+        Path("data/processed/exposure_price_panel.parquet"),
+        help="Region-category-month panel with log prices and the exposure shock.",
+    ),
+    output: Path = typer.Option(
+        Path("report/tables/pass_through.csv"), help="Where to write the estimates."
+    ),
+) -> None:
+    """Estimate the dynamic pass-through function with few-cluster inference.
+
+    Runs the horizons configured in config/analysis.yaml, then the pre-trend
+    diagnostic and the leave-one-region-out check. Nothing is interpreted here:
+    the command reports the estimates and whether the falsification checks pass.
+    """
+    root = _repo_root()
+    source = root / panel
+    if not source.exists():
+        raise typer.BadParameter(
+            f"{panel} not found. The exposure panel depends on the regional coverage "
+            "tables, whose source is recorded as unavailable in config/sources.yaml."
+        )
+
+    settings = yaml.safe_load((root / "config/analysis.yaml").read_text(encoding="utf-8"))
+    horizons = list(settings["pass_through"]["horizons_months"])
+
+    frame = pd.read_parquet(source)
+    estimates = estimate_panel_local_projections(
+        frame, outcome="log_price", shock="exposure_shock", horizons=horizons
+    )
+
+    destination = root / output
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    estimates.to_csv(destination, index=False)
+    typer.echo(f"Wrote {len(estimates)} horizon estimates to {output}")
+
+    _, verdict = run_pre_trend_diagnostic(frame, outcome="log_price", shock="exposure_shock")
+    outcome_label = "passed" if verdict.passed else "FAILED"
+    typer.echo(f"Pre-trend diagnostic: {outcome_label} - {verdict.detail}")
+    if not verdict.passed:
+        typer.echo("  A causal reading is not supported while leads predict pre-treatment prices.")
 
 
 if __name__ == "__main__":
