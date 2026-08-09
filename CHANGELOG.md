@@ -12,6 +12,11 @@ was.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-09
+
+First archived release. No estimate changes: this release makes the repository
+citable, licensed, and continuously verified, and does not alter any result.
+
 ### Added
 
 - Repository governance: `LICENSE` (MIT) and `LICENSE-CC-BY-4.0.txt`,
@@ -26,6 +31,24 @@ was.
   `CITATION.cff` to match.
 - CI validation of `CITATION.cff` against the CFF 1.2.0 schema and of
   `.zenodo.json`, including a cross-check that both agree on title and version.
+
+### Changed
+
+- Packaging migrated to the PEP 621 `[project]` table, clearing the Poetry 2
+  deprecation warnings.
+- `poetry.lock` is now committed, so a rerun resolves to the same dependency
+  versions.
+- Dependency floors raised past known advisories: `lxml` to 6.1 (XXE via the
+  default `iterparse()` configuration), `pyarrow` to 23.0.1 (use-after-free
+  reading IPC files), `pytest` to 9.0.3 (tmpdir handling).
+
+### Fixed
+
+- The scaffold did not satisfy its own lint and type gates. Corrected a
+  `groupby` aggregation that returned a Series where a DataFrame was renamed,
+  an under-typed row dictionary in the Eurostat adapter, a flake8-bugbear
+  false positive on Typer's call-valued defaults, and missing import handling
+  for the untyped `statsmodels`.
 
 ## [0.1.0] - 2026-08-09
 
@@ -45,5 +68,6 @@ was.
 - `report/`: LaTeX manuscript skeleton with sections and bibliography.
 - Unit tests for minimum-wage and exposure processing.
 
-[Unreleased]: https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/releases/tag/v0.1.0

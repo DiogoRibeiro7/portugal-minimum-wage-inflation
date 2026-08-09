@@ -35,7 +35,7 @@ keywords:
   - reproducible research
 license: MIT
 license-url: 'https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/blob/main/LICENSE'
-version: 0.1.0
+version: 0.2.0
 # Uncomment and fill in after the first Zenodo release. Use the *concept* DOI,
 # the one Zenodo describes as resolving to "all versions".
 # identifiers:
