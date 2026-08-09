@@ -21,6 +21,11 @@ was.
   and 3.13.
 - Dependabot updates for Poetry dependencies and GitHub Actions.
 - `.gitattributes` enforcing LF line endings and correct binary handling.
+- `.zenodo.json` supplying deposit metadata for Zenodo archiving, so each
+  tagged release is citable by DOI. ORCID and affiliation added to
+  `CITATION.cff` to match.
+- CI validation of `CITATION.cff` against the CFF 1.2.0 schema and of
+  `.zenodo.json`, including a cross-check that both agree on title and version.
 
 ## [0.1.0] - 2026-08-09
 

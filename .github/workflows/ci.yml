@@ -97,6 +97,75 @@ jobs:
           path: coverage.xml
           retention-days: 14
 
+  metadata:
+    name: Citation and archive metadata
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install validators
+        run: pip install --disable-pip-version-check cffconvert pyyaml
+
+      - name: Validate CITATION.cff against the CFF 1.2.0 schema
+        run: cffconvert --validate -i CITATION.cff
+
+      - name: Validate .zenodo.json
+        run: |
+          python - <<'PY'
+          import json
+          import sys
+
+          with open(".zenodo.json", encoding="utf-8") as handle:
+              metadata = json.load(handle)
+
+          required = {"upload_type", "title", "creators", "license", "access_right"}
+          missing = required.difference(metadata)
+          if missing:
+              sys.exit(f".zenodo.json missing required keys: {sorted(missing)}")
+
+          for creator in metadata["creators"]:
+              if "name" not in creator:
+                  sys.exit(f"creator without a name: {creator}")
+              orcid = creator.get("orcid")
+              # Zenodo wants the bare identifier, not the resolver URL.
+              if orcid and (orcid.startswith("http") or len(orcid) != 19):
+                  sys.exit(f"orcid must be a bare 0000-0000-0000-0000 identifier: {orcid!r}")
+
+          print("zenodo metadata ok")
+          PY
+
+      - name: Check the two records agree on title and version
+        run: |
+          python - <<'PY'
+          import json
+          import sys
+
+          import yaml
+
+          with open(".zenodo.json", encoding="utf-8") as handle:
+              zenodo = json.load(handle)
+          with open("CITATION.cff", encoding="utf-8") as handle:
+              citation = yaml.safe_load(handle)
+
+          def normalise(text: str) -> str:
+              return " ".join(text.split())
+
+          problems = []
+          if normalise(zenodo["title"]) != normalise(citation["title"]):
+              problems.append("title differs between .zenodo.json and CITATION.cff")
+          if str(zenodo.get("version")) != str(citation.get("version")):
+              problems.append("version differs between .zenodo.json and CITATION.cff")
+
+          if problems:
+              sys.exit("; ".join(problems))
+
+          print("citation and archive metadata agree")
+          PY
+
   build:
     name: Build package
     runs-on: ubuntu-latest

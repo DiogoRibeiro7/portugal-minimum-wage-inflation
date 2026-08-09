@@ -185,6 +185,34 @@ If you use this repository, please cite it. GitHub renders `CITATION.cff` as a
 "Cite this repository" button; the same metadata is machine-readable for
 reference managers.
 
+## Archiving and DOI
+
+Each tagged release is archived on Zenodo, which mints a DOI so a specific state
+of the analysis can be cited and retrieved even if this repository moves or
+disappears. `.zenodo.json` supplies the deposit metadata — author, ORCID,
+affiliation, licence, keywords — so the record does not depend on whatever
+Zenodo infers from the repository.
+
+Zenodo issues two kinds of DOI. The **concept DOI** always resolves to the
+latest version and is the one to cite in a paper that should track the current
+analysis; a **version DOI** pins one release and is the one to cite when a
+result must be reproducible exactly.
+
+To enable archiving, once:
+
+1. Sign in to [zenodo.org](https://zenodo.org) with the GitHub account that owns
+   this repository.
+2. Under **GitHub** in the Zenodo account settings, flip this repository on.
+3. Publish a GitHub release. Zenodo archives the tag and mints the DOI.
+   *Only releases created after the toggle are archived — an existing tag is not
+   picked up retroactively, so cut a fresh release if `v0.1.0` predates it.*
+4. Paste the concept DOI badge here, and uncomment the `identifiers:` block at
+   the bottom of `CITATION.cff` so the citation metadata carries the DOI too.
+
+`CITATION.cff` and `.zenodo.json` are validated in CI, including a check that
+they agree on title and version — a release with contradictory metadata fails
+before it is archived.
+
 ## Licence
 
 Dual-licensed:

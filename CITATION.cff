@@ -4,14 +4,17 @@ title: >-
   exposure-based analysis
 message: >-
   If you use this software or the accompanying analysis, please cite it using
-  the metadata below.
+  the metadata below. Where a version-specific record exists on Zenodo, cite
+  that DOI; otherwise cite the concept DOI, which always resolves to the latest
+  version.
 type: software
 authors:
   - given-names: Diogo
     family-names: Ribeiro
     email: diogo_dj@hotmail.com
-    # Add your ORCID once available:
-    # orcid: 'https://orcid.org/0000-0000-0000-0000'
+    orcid: 'https://orcid.org/0009-0001-2022-7072'
+    affiliation: >-
+      School of Media Arts and Design, Polytechnic of Porto, Portugal
 repository-code: 'https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation'
 abstract: >-
   Reproducible research repository studying the interaction between Portugal's
@@ -23,11 +26,19 @@ abstract: >-
 keywords:
   - minimum wage
   - inflation
-  - pass-through
+  - price pass-through
   - labour productivity
   - Portugal
   - local projections
+  - panel data
+  - HICP
   - reproducible research
 license: MIT
 license-url: 'https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/blob/main/LICENSE'
 version: 0.1.0
+# Uncomment and fill in after the first Zenodo release. Use the *concept* DOI,
+# the one Zenodo describes as resolving to "all versions".
+# identifiers:
+#   - type: doi
+#     value: 10.5281/zenodo.XXXXXXX
+#     description: Concept DOI resolving to the latest version

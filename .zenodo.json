@@ -1,0 +1,37 @@
+{
+  "upload_type": "software",
+  "title": "Portugal Minimum Wage, Productivity and Inflation: a reproducible exposure-based analysis",
+  "version": "0.1.0",
+  "language": "eng",
+  "access_right": "open",
+  "license": "mit",
+  "creators": [
+    {
+      "name": "Ribeiro, Diogo",
+      "affiliation": "School of Media Arts and Design, Polytechnic of Porto, Portugal",
+      "orcid": "0009-0001-2022-7072"
+    }
+  ],
+  "description": "<p>Reproducible research repository studying the interaction between Portugal's statutory minimum wage, labour productivity, and consumer-price inflation, from the introduction of the national minimum wage in 1974 to the present.</p><p>The analysis is built in two complementary layers:</p><ol><li><strong>Long-run macro accounting, 1974&ndash;present.</strong> Minimum-wage growth is decomposed into compensation for prior inflation, productivity growth, and a residual policy component.</li><li><strong>Price pass-through identification, post-2000.</strong> Heterogeneous minimum-wage exposure across Portuguese regions and industries &mdash; together with regional minimum-wage differentiation in Madeira and the Azores &mdash; is used to estimate the effect of minimum-wage policy shocks on consumer prices, via panel local projections.</li></ol><p>The intended contribution is not a national time-series correlation between minimum-wage growth and inflation, but a transparent exposure-based design linking statutory wage shocks to the CPI/HICP categories most exposed to minimum-wage labour costs.</p><p>The repository enforces its reproducibility rules in code: raw downloads are immutable and checksummed, every source records provenance, transformations are deterministic and tested without network access, statistical specifications live in YAML rather than in notebooks, and every figure and table in the manuscript is generated rather than copied by hand.</p><p><strong>Licensing.</strong> This record is deposited under the MIT Licence, which covers the software. The written research output in <code>report/</code> and <code>docs/</code> is separately licensed under CC BY 4.0, and third-party data retrieved into <code>data/</code> remains subject to its original provider's terms. See the LICENSE file in the archive.</p>",
+  "notes": "Dual-licensed: MIT for code (src/, tests/, notebooks/, config/, packaging); CC BY 4.0 for the manuscript and documentation (report/, docs/). Zenodo records a single licence, so the deposit is registered under MIT. Downloaded source data under data/ is not covered by either licence.",
+  "keywords": [
+    "minimum wage",
+    "inflation",
+    "price pass-through",
+    "labour productivity",
+    "Portugal",
+    "local projections",
+    "panel data",
+    "HICP",
+    "reproducible research",
+    "economics"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation",
+      "relation": "isSupplementTo",
+      "resource_type": "software",
+      "scheme": "url"
+    }
+  ]
+}
