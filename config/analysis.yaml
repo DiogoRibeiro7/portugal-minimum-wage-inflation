@@ -1,0 +1,29 @@
+macro:
+  start_year: 1974
+  benchmark_inflation_lag: 1
+  use_exact_compounding: true
+  regimes:
+    - {name: revolutionary_transition, start: 1974, end: 1985}
+    - {name: european_integration, start: 1986, end: 1998}
+    - {name: euro_pre_crisis, start: 1999, end: 2009}
+    - {name: sovereign_debt_crisis, start: 2010, end: 2014}
+    - {name: minimum_wage_restart, start: 2015, end: 2019}
+    - {name: pandemic_and_inflation, start: 2020, end: 2026}
+
+pass_through:
+  horizons_months: [0, 1, 3, 6, 12, 18, 24]
+  exposure_reference: "predetermined"
+  include_region_fixed_effects: true
+  include_category_fixed_effects: true
+  include_time_fixed_effects: true
+  inference:
+    cluster: region
+    small_cluster_correction: true
+    wild_cluster_bootstrap: true
+  controls:
+    - energy_inflation
+    - imported_inflation
+    - hicp_constant_tax_gap
+    - unemployment_rate
+    - tourism_intensity
+    - pandemic_indicator

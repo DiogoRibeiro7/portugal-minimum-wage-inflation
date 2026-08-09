@@ -1,0 +1,56 @@
+[tool.poetry]
+name = "pt-minimum-wage-inflation"
+version = "0.1.0"
+description = "Reproducible empirical study of minimum wages, productivity and inflation in Portugal."
+authors = ["Diogo Ribeiro"]
+readme = "README.md"
+packages = [{ include = "pt_mw_inflation", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pandas = "^2.3"
+numpy = "^2.2"
+requests = "^2.32"
+pyyaml = "^6.0"
+pydantic = "^2.11"
+typer = {version = "^0.16", extras = ["all"]}
+openpyxl = "^3.1"
+lxml = "^5.4"
+beautifulsoup4 = "^4.13"
+pyarrow = "^20.0"
+statsmodels = "^0.14"
+linearmodels = "^6.1"
+scipy = "^1.15"
+matplotlib = "^3.10"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4"
+pytest-cov = "^6.2"
+mypy = "^1.16"
+ruff = "^0.12"
+pre-commit = "^4.2"
+types-requests = "^2.32"
+types-PyYAML = "^6.0"
+
+[tool.poetry.scripts]
+ptmw = "pt_mw_inflation.cli:app"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+
+[build-system]
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"

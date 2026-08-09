@@ -1,0 +1,21 @@
+sources:
+  dgert_minimum_wage:
+    provider: DGERT
+    kind: html
+    url: "https://www.dgert.gov.pt/evolucao-da-remuneracao-minima-mensal-garantida-rmmg"
+    destination: "data/raw/dgert/minimum_wage_history.html"
+    description: "Official history of the Portuguese guaranteed minimum monthly remuneration."
+
+  gep_2013_bulletin_xlsx:
+    provider: GEP/MTSSS
+    kind: xlsx
+    url: "https://www.gep.mtsss.gov.pt/documents/10182/10925/bemar2013.xlsx/ca273b69-dda7-4c13-9c18-1703d580fdc3"
+    destination: "data/raw/gep/bulletin_2013_03.xlsx"
+    description: "Historical labour-market bulletin with minimum-wage and regional/sectoral tables."
+
+  eurostat_hicp_metadata:
+    provider: Eurostat
+    kind: html
+    url: "https://ec.europa.eu/eurostat/cache/metadata/en/prc_hicp_esms.htm"
+    destination: "data/raw/eurostat/hicp_metadata.html"
+    description: "HICP metadata and classification information."
