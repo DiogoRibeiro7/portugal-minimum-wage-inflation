@@ -112,21 +112,62 @@ change should be dated to the year it was legislated for.
 2012, 2013 and 2015. For 2012 and 2013 this reflects the wage freeze under the
 adjustment programme; for 2000 it reflects the gap in the upstream page.
 
-## Macro annual dataset
+## `data/processed/macro_annual.parquet`
 
-Built by `ptmw build macro`. Requires `year`, `minimum_wage`, `inflation` and
-`productivity_growth`, with rates as decimals.
+Built by `ptmw build macro` from the statutory panel, the World Bank consumer
+price index and AMECO productivity. One row per year, 1974 onwards.
 
 | Column | Meaning |
 | ------ | ------- |
-| `minimum_wage_growth` | Year-on-year growth of the nominal minimum wage. |
-| `lagged_inflation` | CPI inflation lagged by `benchmark_inflation_lag` years. |
+| `year` | Calendar year. |
+| `minimum_wage` | Day-weighted statutory monthly wage, euro. |
+| `cpi` | Consumer price index (World Bank, `FP.CPI.TOTL`). |
+| `productivity` | Real GDP per person employed (AMECO `PRT.1.1.0.0.RVGDE`). |
+| `inflation` | Growth of `cpi`. |
+| `productivity_growth` | Growth of `productivity`. |
+| `minimum_wage_growth` | Growth of the nominal minimum wage. |
+| `lagged_inflation` | Inflation lagged by `benchmark_inflation_lag` years. |
 | `benchmark_wage_growth` | `(1 + productivity_growth)(1 + lagged_inflation) − 1`. |
 | `policy_residual` | `minimum_wage_growth − benchmark_wage_growth`. |
-| `log_minimum_wage_growth` | First difference of the log nominal minimum wage. |
+| `real_minimum_wage` | Nominal wage deflated to the first year's prices. |
+| `minimum_wage_index` | Nominal wage, first year = 100. |
+| `real_minimum_wage_index` | Real wage, first year = 100. |
+| `productivity_index` | Productivity, first year = 100. |
+| `minimum_wage_to_productivity_index` | Real wage per unit of productivity, first year = 100. |
+| `log_minimum_wage_growth` | First difference of the log nominal wage. |
+| `cumulative_policy_residual` | Running sum of the residual. |
+
+The benchmark **compounds** rather than adds. At the inflation rates of the
+early 1980s the additive approximation understates it by more than a
+percentage point, which exceeds most of the residuals being measured.
+
+`check_accounting_identities` verifies the residual, benchmark and real-wage
+identities on every build, not only in tests.
 
 The residual is descriptive. It is not a causal estimate, and the causal work
 uses predetermined exposure and panel variation instead.
+
+### Why these providers
+
+| Series | Provider | Coverage | Why not the alternative |
+| ------ | -------- | -------- | ----------------------- |
+| Consumer prices | World Bank | 1960– | Eurostat HICP for Portugal begins in 1996. |
+| Productivity | AMECO | 1960– | Eurostat national accounts begin in 1995 for Portugal. |
+
+AMECO and Eurostat overlap for 31 years and agree to within 0.003 percentage
+points of annual growth, so the longer series costs nothing in consistency.
+AMECO publishes Commission projections past the last outturn; `last_actual_year`
+in `config/analysis.yaml` excludes them. Raise it only when the year is an
+outturn.
+
+### Provenance of the wage series
+
+`minimum_wage_source` on the annual series records which compiler each
+observation came from. It is `DGERT statutory history` everywhere except 2000,
+whose act is absent from the national page; that year is taken from Eurostat and
+labelled accordingly. The correction fires only where the two compilers
+materially disagree, so genuine freezes such as 2012 and 2013 are left
+untouched.
 
 ## Exposure and price panels
 
