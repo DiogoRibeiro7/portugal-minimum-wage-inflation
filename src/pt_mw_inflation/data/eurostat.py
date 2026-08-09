@@ -96,6 +96,38 @@ def fetch_portugal_hicp(geo: str = "PT") -> pd.DataFrame:
     )
 
 
+#: Eurostat publishes national minimum wages on a twelve-month basis. Portugal
+#: pays the statutory monthly wage fourteen times a year, so Eurostat's figure
+#: is the monthly level times 14/12. Dividing it back gives a series directly
+#: comparable to the level in Portuguese law.
+PORTUGUESE_PAYMENTS_PER_YEAR = 14
+EUROSTAT_MONTHS_PER_YEAR = 12
+
+
+def fetch_minimum_wage(geo: str = "PT", currency: str = "NAC") -> pd.DataFrame:
+    """Fetch Eurostat's bi-annual statutory minimum wage series.
+
+    This is an independent check on the national legal history: the two are
+    compiled by different institutions from different documents, so agreement
+    between them is meaningful evidence that the legal history was read
+    correctly.
+
+    Args:
+        geo: Eurostat geography code.
+        currency: Eurostat currency code; ``NAC`` is the national currency.
+
+    Returns:
+        Observations with the published value and, for Portugal, the implied
+        monthly statutory level after removing the twelve-month convention.
+    """
+    frame = fetch_dataset("earn_mw_cur", {"geo": geo, "currency": currency})
+    if geo == "PT":
+        frame["implied_monthly_statutory_eur"] = frame["value"] * (
+            EUROSTAT_MONTHS_PER_YEAR / PORTUGUESE_PAYMENTS_PER_YEAR
+        )
+    return frame
+
+
 def save_frame(frame: pd.DataFrame, path: Path) -> None:
     """Persist an API result as Parquet, including a sidecar source URL."""
     path.parent.mkdir(parents=True, exist_ok=True)
