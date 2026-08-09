@@ -1,6 +1,7 @@
 # Portugal Minimum Wage Inflation
 
 [![CI](https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/actions/workflows/ci.yml/badge.svg)](https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/actions/workflows/ci.yml)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21864603.svg)](https://doi.org/10.5281/zenodo.21864603)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/lint-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://img.shields.io/badge/mypy-strict-2a6db2.svg)](https://mypy-lang.org/)
@@ -193,25 +194,22 @@ disappears. `.zenodo.json` supplies the deposit metadata — author, ORCID,
 affiliation, licence, keywords — so the record does not depend on whatever
 Zenodo infers from the repository.
 
-Zenodo issues two kinds of DOI. The **concept DOI** always resolves to the
-latest version and is the one to cite in a paper that should track the current
-analysis; a **version DOI** pins one release and is the one to cite when a
-result must be reproducible exactly.
+Zenodo issues two kinds of DOI:
 
-To enable archiving, once:
+| DOI | Value | Cite it when |
+| --- | ----- | ------------ |
+| **Concept** | [`10.5281/zenodo.21864603`](https://doi.org/10.5281/zenodo.21864603) | The citation should track the current analysis. Always resolves to the latest version. |
+| **Version** | [`10.5281/zenodo.21864604`](https://doi.org/10.5281/zenodo.21864604) (v0.2.0) | A result must be reproducible exactly. Pins one release. |
 
-1. Sign in to [zenodo.org](https://zenodo.org) with the GitHub account that owns
-   this repository.
-2. Under **GitHub** in the Zenodo account settings, flip this repository on.
-3. Publish a GitHub release. Zenodo archives the tag and mints the DOI.
-   *Only releases created after the toggle are archived — an existing tag is not
-   picked up retroactively, so cut a fresh release if `v0.1.0` predates it.*
-4. Paste the concept DOI badge here, and uncomment the `identifiers:` block at
-   the bottom of `CITATION.cff` so the citation metadata carries the DOI too.
+Archiving is already enabled: publishing a GitHub release is enough, and Zenodo
+mints a new version DOI under the same concept DOI automatically. When cutting
+a release, bump the version in `pyproject.toml`, `CITATION.cff` and
+`.zenodo.json` together — `.zenodo.json` is what the deposit records, so a
+stale value there mislabels the archive.
 
 `CITATION.cff` and `.zenodo.json` are validated in CI, including a check that
-they agree on title and version — a release with contradictory metadata fails
-before it is archived.
+they agree on title and version, so a release cannot be archived with
+contradictory metadata.
 
 ## Licence
 

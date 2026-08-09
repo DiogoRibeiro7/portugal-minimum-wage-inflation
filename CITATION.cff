@@ -36,9 +36,15 @@ keywords:
 license: MIT
 license-url: 'https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/blob/main/LICENSE'
 version: 0.2.0
-# Uncomment and fill in after the first Zenodo release. Use the *concept* DOI,
-# the one Zenodo describes as resolving to "all versions".
-# identifiers:
-#   - type: doi
-#     value: 10.5281/zenodo.XXXXXXX
-#     description: Concept DOI resolving to the latest version
+doi: 10.5281/zenodo.21864603
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.21864603
+    description: >-
+      Concept DOI. Always resolves to the latest archived version; cite this
+      when the reference should track the current analysis.
+  - type: doi
+    value: 10.5281/zenodo.21864604
+    description: >-
+      Version DOI for v0.2.0. Cite this when a result must be reproducible
+      against one exact release.

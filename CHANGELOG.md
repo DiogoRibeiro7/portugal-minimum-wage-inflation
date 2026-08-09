@@ -12,6 +12,11 @@ was.
 
 ## [Unreleased]
 
+### Added
+
+- Concept and version DOIs from the first Zenodo deposit, recorded in
+  `CITATION.cff` and as a README badge.
+
 ## [0.2.0] - 2026-08-09
 
 First archived release. No estimate changes: this release makes the repository
