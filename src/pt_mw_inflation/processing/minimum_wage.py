@@ -198,6 +198,64 @@ def annual_minimum_wage(
     return annual.dropna(subset=["minimum_wage_january"]).reset_index(drop=True)
 
 
+def reconcile_annual_with_eurostat(
+    annual: pd.DataFrame,
+    eurostat: pd.DataFrame,
+    *,
+    tolerance: float = 0.02,
+) -> pd.DataFrame:
+    """Correct years the national page omits, using an independent compiler.
+
+    A year with no listed act is normally genuine: the wage was simply not
+    raised, as in 2012 and 2013 under the adjustment programme, and carrying the
+    previous level forward is right. But when the provider's history is missing
+    an act, the carry-forward is wrong, and nothing in the national source
+    distinguishes the two cases.
+
+    Eurostat compiles the same statutory wage independently. Where the two agree
+    the carry-forward is confirmed; where Eurostat is materially higher, an act
+    is missing and the Eurostat level is used instead. Every observation records
+    which compiler it came from, so no corrected value is ever mistaken for the
+    national legal source.
+
+    Args:
+        annual: Output of :func:`annual_minimum_wage`.
+        eurostat: Eurostat observations with `year` and
+            `implied_monthly_statutory_eur`.
+        tolerance: Relative gap above which the carry-forward is treated as an
+            omission rather than as rounding.
+
+    Returns:
+        The annual series with `minimum_wage_source` added, and corrected levels
+        where the national history is incomplete.
+
+    Raises:
+        ValueError: If the Eurostat frame lacks the required columns.
+    """
+    required = {"year", "implied_monthly_statutory_eur"}
+    missing = required.difference(eurostat.columns)
+    if missing:
+        raise ValueError(f"eurostat frame missing columns: {sorted(missing)}")
+
+    reference = eurostat.groupby("year")["implied_monthly_statutory_eur"].mean().rename("reference")
+    result = annual.merge(reference, left_on="year", right_index=True, how="left")
+    result["minimum_wage_source"] = "DGERT statutory history"
+
+    # Only years with no listed act can be wrong through omission; a year with
+    # an act has its value directly from the legal text.
+    candidates = (
+        (result["statutory_acts"] == 0)
+        & result["reference"].notna()
+        & (result["reference"] > result["minimum_wage_january"] * (1.0 + tolerance))
+    )
+
+    for column in ("minimum_wage_january", "minimum_wage_mean"):
+        result.loc[candidates, column] = result.loc[candidates, "reference"]
+    result.loc[candidates, "minimum_wage_source"] = "Eurostat earn_mw_cur (act absent from DGERT)"
+
+    return result.drop(columns=["reference"])
+
+
 def build_policy_residual(frame: pd.DataFrame, inflation_lag: int = 1) -> pd.DataFrame:
     """Compute minimum-wage growth and the productivity-plus-inflation residual.
 
