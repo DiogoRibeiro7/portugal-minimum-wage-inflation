@@ -32,9 +32,9 @@ dependencies = [
     "pydantic>=2.11,<3.0",
     "typer[all]>=0.16,<1.0",
     "openpyxl>=3.1,<4.0",
-    "lxml>=5.4,<6.0",
+    "lxml>=6.1,<7.0",
     "beautifulsoup4>=4.13,<5.0",
-    "pyarrow>=20.0",
+    "pyarrow>=23.0.1",
     "statsmodels>=0.14,<1.0",
     "linearmodels>=6.1,<7.0",
     "scipy>=1.15,<2.0",
@@ -54,7 +54,7 @@ ptmw = "pt_mw_inflation.cli:app"
 packages = [{ include = "pt_mw_inflation", from = "src" }]
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.4"
+pytest = "^9.0.3"
 pytest-cov = "^6.2"
 mypy = "^1.16"
 ruff = "^0.12"
