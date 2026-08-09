@@ -133,3 +133,49 @@ uses predetermined exposure and panel variation instead.
 Not yet populated. The exposure panel depends on the GEP coverage tables, which
 the provider has withdrawn; see `config/sources.yaml` for the recorded
 citation and the reason the source is disabled.
+
+## Estimation output
+
+Produced by `estimate_panel_local_projections`, written by
+`ptmw analyse pass-through`.
+
+| Column | Meaning |
+| ------ | ------- |
+| `horizon` | Horizon in months, from `config/analysis.yaml`. |
+| `coefficient` | Cumulative log-price response to the exposure shock. |
+| `standard_error` | Cluster-robust standard error, clustered on region. |
+| `t_statistic` | Coefficient divided by the cluster-robust standard error. |
+| `p_value_clustered` | Two-sided normal p-value. **Reported for comparison only.** |
+| `p_value_bootstrap` | Restricted wild-cluster-bootstrap p-value. |
+| `observations` | Rows entering the horizon regression. |
+| `clusters` | Number of clusters, which is the binding constraint on inference. |
+
+`p_value_clustered` is not a valid basis for a conclusion in this design.
+Cluster-robust inference is asymptotic in the number of clusters, and with the
+seven NUTS II regions the test over-rejects severely: in simulation, at a
+nominal five per cent it rejects a true null about twenty per cent of the time,
+while the bootstrap holds its size. Both are reported so the gap is visible;
+**cite `p_value_bootstrap`.**
+
+With seven clusters there are only `2**7 = 128` distinct Rademacher sign
+vectors, so the bootstrap enumerates all of them and the p-value is exact
+rather than simulated. The `exhaustive` flag on `ClusterInference` records
+this.
+
+## Event study
+
+Produced by `estimate_event_study`.
+
+| Column | Meaning |
+| ------ | ------- |
+| `event_time` | Periods relative to the shock. Negative values are leads. |
+| `coefficient` | Effect on price growth at that event time. |
+| `standard_error` | Cluster-robust standard error. Exactly 0 at the reference. |
+| `t_statistic` | Ratio of the two. |
+
+The reference lead is normalised to zero and retained in the output, so plots
+cannot silently drop it. `assess_pre_trends` returns a verdict naming every
+lead significant at `|t| > 1.96`.
+
+Passing the pre-trend test does not establish parallel trends; it fails to
+refute them, and an underpowered design passes trivially.

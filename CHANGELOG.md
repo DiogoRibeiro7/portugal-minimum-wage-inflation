@@ -31,6 +31,22 @@ was.
   withdrawn sources, which must state why they are unreachable.
 - Cross-validation against Eurostat's independently compiled minimum-wage
   series, pinned in the test suite at five years.
+- Few-cluster inference: restricted wild cluster bootstrap with Rademacher
+  weights, exhaustive over all `2**G` sign vectors when the cluster count is
+  small, and cluster-level randomization inference.
+- Panel local projections reporting both the conventional clustered p-value and
+  the bootstrap p-value at every horizon, so the difference between them is
+  visible rather than hidden.
+- Event-study estimation with a normalised reference lead, and a pre-trend
+  verdict naming every offending lead.
+- Falsification checks: leave-one-region-out with a deviation summary in
+  standard errors, placebo shock dating, and comparison across exposure
+  definitions.
+- Exposure bridge validation: bridge weights must sum to one per consumption
+  category, shares must be proportions rather than percentages, and the
+  baseline bite is frozen before each policy episode.
+- Synthetic panel generator with a known dynamic response, used to verify that
+  the estimators recover the truth and that each falsification check fires.
 
 ### Changed
 
