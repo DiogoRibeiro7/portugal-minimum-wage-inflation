@@ -186,3 +186,56 @@ def industry_shares(
     return shares[["region", "activity", "employment_share", "baseline_year"]].reset_index(
         drop=True
     )
+
+
+#: National employment by detailed NACE activity. Supplies the weights needed to
+#: aggregate a section-level bite onto the coarser groups the regional accounts
+#: publish, and to see how much of a group has no measured bite at all.
+NATIONAL_EMPLOYMENT_DATASET = "nama_10_a64_e"
+
+
+def fetch_national_employment(
+    *,
+    year: int,
+    country: str = "PT",
+    dataset: str = NATIONAL_EMPLOYMENT_DATASET,
+    timeout_seconds: int = 180,
+) -> pd.DataFrame:
+    """Fetch national employment by NACE activity for one year.
+
+    Args:
+        year: Reference year.
+        country: Geography code.
+        dataset: Eurostat dataset code.
+        timeout_seconds: Request timeout.
+
+    Returns:
+        Columns `activity` and `employment_thousands`.
+
+    Raises:
+        requests.HTTPError: If the request fails.
+        RegionalEmploymentError: If the response carries no observations.
+    """
+    response = requests.get(
+        f"{EUROSTAT_API}/{dataset}",
+        params={
+            "format": "JSON",
+            "lang": "EN",
+            "geo": country,
+            "na_item": "EMP_DC",
+            "unit": "THS_PER",
+            "time": str(year),
+        },
+        timeout=timeout_seconds,
+        headers={"User-Agent": USER_AGENT},
+    )
+    response.raise_for_status()
+    frame = _decode(json.loads(response.content))
+
+    return (
+        frame.rename(columns={"nace_r2": "activity", "value": "employment_thousands"})[
+            ["activity", "employment_thousands"]
+        ]
+        .sort_values("activity")
+        .reset_index(drop=True)
+    )

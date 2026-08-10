@@ -209,20 +209,44 @@ So the design is constrained by an assumption, not blocked by missing data.
 Those are different positions and the earlier document asserted the wrong one.
 
 **What the measure delivers.** Frozen on 2015 composition, exposure ranges from
-18.4 per cent in Norte to 20.5 per cent in the Algarve, with every one of the
-nine regions taking a distinct value. The regional composition behind it varies
+20.0 per cent in Grande Lisboa to 21.8 per cent in the Norte, with every one of
+the nine regions taking a distinct value. The composition behind it varies
 sharply: the Algarve has 38.8 per cent of employment in trade, transport,
 accommodation and food service against the Alentejo's 20.5, while the Alentejo
 has 22.0 per cent in agriculture against Grande Lisboa's 0.7.
 
-**Two limits to state when using it.** The published bite excludes agriculture
-and public administration, so between 78 and 99 per cent of a region's
-employment carries a measured bite; the covered share is returned alongside the
-exposure rather than renormalised away silently. And the regional accounts
-publish employment at coarser activity groups than the survey reports the bite
-at, so each group takes an unweighted mean of its sections. That compresses the
-spread, most visibly for industry, where manufacturing's high bite is averaged
-with a near-zero-bite utility sector.
+**The aggregation must be employment-weighted, and it was not.** The regional
+accounts publish coarser activity groups than the survey measures the bite at,
+so each group's bite is the mean of its sections. Taking that mean unweighted
+puts manufacturing and a near-zero-bite utility sector on equal footing: it
+gives industry a bite of 13.7 per cent where the employment-weighted figure is
+23.5. That is not a rounding difference. It reversed the regional ordering, with
+the unweighted version placing the tourism-heavy Algarve top and the
+manufacturing-heavy Norte bottom, which the weighted version exactly inverts.
+National employment by NACE section supplies the weights.
+
+**Coverage must be measured, not assumed.** The survey excludes agriculture and
+public administration. Agriculture is its own group and is straightforwardly
+absent, but public administration shares a group with education and health, so
+assigning the surveyed sections' bite to the whole group imputes a minimum wage
+to workers nobody surveyed and reports the group as fully covered. Measuring it
+properly, that group is 69.8 per cent covered and arts-and-other-services 58.4
+per cent, which takes regional coverage down to a 67.5 to 89.5 per cent range
+from the 78 to 99 previously reported.
+
+**Predetermination is enforced, not assumed.** The published bite is dated
+October 2017. Applying it to the 2015 policy restart would make exposure
+post-treatment, since coverage after a rise is partly caused by it, and nothing
+in the data prevents that. `check_predetermined` refuses a bite or composition
+dated at or after the first shock. It currently refuses the 2015 episode, which
+is correct: estimating that episode needs an earlier GEP snapshot, not a
+different argument.
+
+**Whether the variation is strong enough is a separate question.** The spread is
+1.83 percentage points and the coefficient of variation 0.027. Nine distinct
+values establish that a regional effect is identified in principle;
+they do not establish that it is identified precisely enough to be informative,
+and `require_regional_variation` answers only the first question.
 
 `require_regional_variation` accepts this measure, having rejected the
 marginals-derived construction it replaces. The guard was right about the old
