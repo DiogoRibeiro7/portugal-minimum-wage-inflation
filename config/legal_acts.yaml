@@ -36,7 +36,14 @@ regional:
     name: Região Autónoma da Madeira
     jurisdiction: m
     mechanism: explicit_value
+    # Madeira has legislated its own value since at least 2010, and the acts for
+    # 2010-2018, 2021 and 2022 are not yet registered here. Each must be added
+    # with its citation rather than inferred, so the regional series currently
+    # falls back to the national wage in those years and the design's
+    # identifying variation is narrower than the region's history allows.
     acts:
+      - {act_type: declegreg, number: 1, act_date: 2019-02-15, effective_date: 2019-01-01}
+      - {act_type: declegreg, number: 2, act_date: 2020-03-03, effective_date: 2020-01-01}
       - {act_type: declegreg, number: 11, act_date: 2023-02-14, effective_date: 2023-01-01}
       - {act_type: declegreg, number: 3, act_date: 2024-02-08, effective_date: 2024-01-01}
       - {act_type: declegreg, number: 20, act_date: 2024-12-23, effective_date: 2025-01-01}
