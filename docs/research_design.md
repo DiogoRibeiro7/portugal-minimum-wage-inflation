@@ -143,3 +143,60 @@ Do not write a causal conclusion unless all of the following hold:
 5. tax and energy shocks are addressed;
 6. the result survives alternative exposure definitions;
 7. the long-run macro layer and panel layer tell a coherent story without forcing agreement.
+
+## Feasibility of the region-by-industry exposure measure
+
+The exposure design requires a predetermined bite $b_{rs,0}$ that varies over
+both regions and industries. The Portuguese sources that survive do not supply
+one, and the gap is structural rather than a matter of effort.
+
+**What exists.** The GEP monitoring reports give the share of full-time
+employees paid the minimum wage **by economic activity, for the country as a
+whole**. The variation across industries is large and real: in October 2017 it
+ranged from 0.6 per cent in electricity and gas to 35.1 per cent in
+accommodation and food, against a national average of 21.6 per cent. The
+Quadros de Pessoal series gives employment **by economic activity** and,
+separately, **by district**.
+
+**What does not exist.** None of the 33 tables in the Quadros de Pessoal series
+crosses a regional dimension with an industry dimension. Every regional table is
+a marginal by district with no industry detail, and every industry table is
+national.
+
+**Why the marginals cannot substitute.** The shift-share alternative aggregates
+national industry bites with regional industry weights,
+$B_r = \sum_s w_{rs} b_s$. Recovering $w_{rs}$ from separate regional and
+industry totals requires assuming that region and industry are independent,
+which sets $w_{rs} = w_s$ and gives every region the national industry mix. The
+resulting exposure is then *numerically identical in every region*, to
+floating-point exactness. It would populate the column, pass every range check,
+and identify nothing: the regressor would be absorbed by the fixed effects or
+carry a coefficient estimated from no variation at all.
+
+`construct_regional_bite` implements the shift-share aggregation for the case
+where a genuine cross-tabulation is available, and `require_regional_variation`
+refuses an exposure whose between-region variance share is zero. The test suite
+demonstrates both branches, including that the marginal-derived construction
+collapses to a single value.
+
+**Even with a cross-tabulation, the assumption is substantive.** Holding the
+bite constant within an industry across regions attenuates precisely the
+variation the design exploits, because accommodation and food --- the highest-bite
+industry by a wide margin --- differs across Portuguese regions in both its size
+and its wage distribution. Anything built this way belongs in the robustness
+section as an explicitly labelled variant, never in the baseline.
+
+**Consequences for identification.** Portuguese statutory changes are national
+on the mainland. If exposure carries no regional variation, the only remaining
+variation is across consumption categories interacting with a common national
+shock. That is a coherent design, and it is a different one: with calendar-time
+fixed effects it identifies *relative* pass-through across categories rather
+than its level, and inference can no longer rest on regional clusters, since the
+effective number of independent shocks is the number of statutory changes. It is
+not a substitute for the regional design and is not reported as one.
+
+**What would unblock the specified design.** Any of: minimum-wage coverage
+published by NUTS II region and economic activity jointly; Quadros de Pessoal
+microdata, from which the cross-tabulation can be built directly; or the Madeira
+and Azores statutory schedules, which would restore genuine regional variation
+in the policy change itself and make a national bite far less damaging.

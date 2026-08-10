@@ -9,10 +9,13 @@ from pt_mw_inflation.processing.exposure import (
     ExposureDefinition,
     ExposureError,
     apply_policy_shock,
+    assess_identifying_variation,
     build_exposure_variants,
     construct_cost_exposure,
+    construct_regional_bite,
     exposure_correlation,
     freeze_baseline_bite,
+    require_regional_variation,
     validate_bridge,
 )
 from tests.synthetic import make_exposure_inputs
@@ -172,3 +175,115 @@ def test_at_least_one_variant_is_required() -> None:
     bite, labour_share, bridge = make_exposure_inputs()
     with pytest.raises(ExposureError, match="at least one exposure definition"):
         build_exposure_variants(bite, labour_share, bridge, [])
+
+
+def _cross_tab() -> pd.DataFrame:
+    """A genuine joint distribution of employment over regions and industries."""
+    return pd.DataFrame(
+        [
+            # Algarve is concentrated in accommodation; Norte in manufacturing.
+            {"region": "Algarve", "industry": "accommodation", "employees": 700},
+            {"region": "Algarve", "industry": "manufacturing", "employees": 300},
+            {"region": "Norte", "industry": "accommodation", "employees": 200},
+            {"region": "Norte", "industry": "manufacturing", "employees": 800},
+        ]
+    )
+
+
+def _industry_bite() -> pd.DataFrame:
+    """National bite by industry, in the range the RMMG report documents."""
+    return pd.DataFrame(
+        [
+            {"industry": "accommodation", "minimum_wage_bite": 0.35},
+            {"industry": "manufacturing", "minimum_wage_bite": 0.24},
+        ]
+    )
+
+
+def test_regional_bite_is_the_employment_weighted_industry_bite() -> None:
+    """The shift-share aggregation must reproduce a hand computation."""
+    result = construct_regional_bite(_cross_tab(), _industry_bite()).set_index("region")
+
+    # Algarve: 0.7*0.35 + 0.3*0.24 = 0.245 + 0.072
+    assert result.loc["Algarve", "minimum_wage_bite"] == pytest.approx(0.317)
+    # Norte: 0.2*0.35 + 0.8*0.24 = 0.07 + 0.192
+    assert result.loc["Norte", "minimum_wage_bite"] == pytest.approx(0.262)
+    assert result.loc["Algarve", "employment"] == 1000
+
+
+def test_genuine_cross_tab_yields_identifying_variation() -> None:
+    """Different industry mixes must produce different regional exposure."""
+    regional = construct_regional_bite(_cross_tab(), _industry_bite())
+    diagnostic = assess_identifying_variation(regional, value_column="minimum_wage_bite")
+    assert diagnostic.identifying
+    assert diagnostic.distinct_values_per_region == 2
+
+
+def test_marginals_cannot_identify_a_regional_effect() -> None:
+    """Employment totals that are only marginals produce no regional variation.
+
+    This is the case the recovered Portuguese sources are actually in: employment
+    is published by industry for the whole country, and separately by district
+    with no industry detail. Reconstructing the joint distribution from the two
+    means assuming region and industry are independent, which makes every
+    region's industry mix the national mix, and every region's exposure
+    identical. The measure looks populated and plausible and identifies nothing.
+    """
+    national_mix = {"accommodation": 0.30, "manufacturing": 0.70}
+    regional_totals = {"Algarve": 1000, "Norte": 4000, "Centro": 2500}
+
+    # Independence: L_rs = (regional total) x (national industry share).
+    from_marginals = pd.DataFrame(
+        [
+            {"region": region, "industry": industry, "employees": total * share}
+            for region, total in regional_totals.items()
+            for industry, share in national_mix.items()
+        ]
+    )
+
+    regional = construct_regional_bite(from_marginals, _industry_bite())
+
+    # Every region gets the same number, to floating-point exactness.
+    assert regional["minimum_wage_bite"].round(12).nunique() == 1
+
+    diagnostic = assess_identifying_variation(regional, value_column="minimum_wage_bite")
+    assert not diagnostic.identifying
+    assert "identical in every region" in diagnostic.detail
+
+    with pytest.raises(ExposureError, match="cannot identify a regional effect"):
+        require_regional_variation(regional, value_column="minimum_wage_bite")
+
+
+def test_regional_bite_rejects_marginal_shaped_input() -> None:
+    """A region repeated without industry detail is not a cross-tabulation."""
+    duplicated = pd.DataFrame(
+        [
+            {"region": "Norte", "industry": "accommodation", "employees": 100},
+            {"region": "Norte", "industry": "accommodation", "employees": 200},
+        ]
+    )
+    with pytest.raises(ExposureError, match="cross-tabulation"):
+        construct_regional_bite(duplicated, _industry_bite())
+
+
+def test_regional_bite_rejects_negative_employment() -> None:
+    """A negative count is a parsing failure, not a small region."""
+    broken = _cross_tab()
+    broken.loc[0, "employees"] = -5
+    with pytest.raises(ExposureError, match="negative counts"):
+        construct_regional_bite(broken, _industry_bite())
+
+
+def test_variation_diagnostic_needs_two_regions() -> None:
+    """A single region cannot exhibit between-region variation."""
+    single = pd.DataFrame([{"region": "Norte", "cost_exposure": 0.3}])
+    with pytest.raises(ExposureError, match="at least two regions"):
+        assess_identifying_variation(single)
+
+
+def test_require_regional_variation_passes_a_healthy_measure() -> None:
+    """A measure with real spread is accepted and reports its share."""
+    regional = construct_regional_bite(_cross_tab(), _industry_bite())
+    diagnostic = require_regional_variation(regional, value_column="minimum_wage_bite")
+    assert diagnostic.between_region_share == pytest.approx(1.0)
+    assert diagnostic.regions == 2

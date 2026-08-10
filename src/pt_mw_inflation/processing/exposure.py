@@ -306,3 +306,192 @@ def exposure_correlation(variants: pd.DataFrame) -> pd.DataFrame:
         values="cost_exposure",
     )
     return wide.corr(method="pearson").replace({np.nan: 1.0})
+
+
+@dataclass(frozen=True)
+class VariationDiagnostic:
+    """How much of an exposure measure's variance is available to identify a regional effect."""
+
+    between_region_share: float
+    regions: int
+    distinct_values_per_region: int
+    identifying: bool
+    detail: str
+
+
+def construct_regional_bite(
+    employment: pd.DataFrame,
+    industry_bite: pd.DataFrame,
+    *,
+    employment_column: str = "employees",
+) -> pd.DataFrame:
+    r"""Aggregate an industry-level bite to regions using local industry mix.
+
+    This is the shift-share construction: where the bite is measured only
+    nationally by industry, a region's exposure is the employment-weighted
+    average of national industry bites,
+
+    .. math::
+
+        B_r = \sum_s w_{rs}\, b_s,
+        \qquad w_{rs} = \frac{L_{rs}}{\sum_{s'} L_{rs'}},
+
+    so all regional variation comes from industry composition. The maintained
+    assumption is that the bite within an industry does not vary across regions.
+
+    That assumption is substantive, not technical. Accommodation and food has by
+    far the highest bite of any Portuguese industry, and the regions differ
+    sharply in how much of it they have and at what wages, so assuming a common
+    within-industry bite attenuates real differences. Anything built this way is
+    a robustness variant, never the baseline.
+
+    The construction also requires a genuine joint distribution of employment
+    over regions and industries. Deriving ``L_{rs}`` from separate regional and
+    industry totals assumes the two are independent, which forces
+    :math:`w_{rs} = w_s` and yields an exposure that is identical in every
+    region. :func:`assess_identifying_variation` detects that case.
+
+    Args:
+        employment: Columns `region`, `industry` and the employment count. Must
+            be a cross-tabulation, not marginals.
+        industry_bite: Columns `industry` and `minimum_wage_bite`.
+        employment_column: Name of the employment count column.
+
+    Returns:
+        Columns `region`, `minimum_wage_bite` and `employment`, one row per
+        region.
+
+    Raises:
+        ExposureError: If required columns are missing, if a region-industry
+            pair is duplicated, or if no industry survives the merge.
+    """
+    _require_columns("employment", employment, frozenset({"region", "industry", employment_column}))
+    _require_columns("industry_bite", industry_bite, frozenset({"industry", "minimum_wage_bite"}))
+    validate_shares(industry_bite, "minimum_wage_bite", name="industry_bite")
+
+    if employment[employment_column].lt(0).any():
+        raise ExposureError(f"employment.{employment_column} contains negative counts")
+
+    duplicated = employment.duplicated(subset=["region", "industry"])
+    if duplicated.any():
+        raise ExposureError(
+            f"{int(duplicated.sum())} duplicate region-industry rows in employment; "
+            "the input must be a cross-tabulation"
+        )
+
+    merged = employment.merge(industry_bite, on="industry", validate="many_to_one")
+    if merged.empty:
+        raise ExposureError("no industries survive the merge; check industry coding consistency")
+
+    totals = merged.groupby("region")[employment_column].transform("sum")
+    if (totals <= 0).any():
+        raise ExposureError("every region must have positive total employment")
+    merged["weight"] = merged[employment_column] / totals
+    merged["weighted_bite"] = merged["weight"] * merged["minimum_wage_bite"]
+
+    aggregated = merged.groupby("region", as_index=False).agg(
+        minimum_wage_bite=("weighted_bite", "sum"),
+        employment=(employment_column, "sum"),
+    )
+    return aggregated.sort_values("region").reset_index(drop=True)
+
+
+def assess_identifying_variation(
+    frame: pd.DataFrame,
+    *,
+    value_column: str = "cost_exposure",
+    region_column: str = "region",
+    minimum_share: float = 0.01,
+) -> VariationDiagnostic:
+    """Measure whether an exposure measure varies across regions at all.
+
+    A regional design is identified by differences between regions. When an
+    exposure is built from national inputs those differences can be exactly
+    zero while every other diagnostic looks healthy: the column is populated,
+    its values are plausible, and the regression runs. The coefficient is then
+    identified by nothing, or absorbed entirely by the fixed effects.
+
+    Args:
+        frame: Exposure measure by region.
+        value_column: Column holding the exposure.
+        region_column: Column identifying the region.
+        minimum_share: Smallest between-region variance share treated as
+            identifying.
+
+    Returns:
+        The between-region share of total variance and a verdict.
+
+    Raises:
+        ExposureError: If the columns are absent or fewer than two regions are
+            present.
+    """
+    _require_columns("exposure", frame, frozenset({value_column, region_column}))
+
+    regions = int(frame[region_column].nunique())
+    if regions < 2:
+        raise ExposureError(f"at least two regions are required, found {regions}")
+
+    values = frame[value_column].astype(float)
+    total_variance = float(values.var(ddof=0))
+    region_means = frame.groupby(region_column)[value_column].transform("mean").astype(float)
+    between_variance = float(region_means.var(ddof=0))
+
+    share = 0.0 if total_variance <= 0 else between_variance / total_variance
+    distinct = int(frame.groupby(region_column)[value_column].mean().round(12).nunique())
+    identifying = distinct > 1 and share >= minimum_share
+
+    if distinct <= 1:
+        detail = (
+            "exposure is identical in every region; the measure was built from "
+            "national inputs and carries no regional variation to identify from"
+        )
+    elif not identifying:
+        detail = f"only {share:.1%} of exposure variance lies between regions"
+    else:
+        detail = f"{share:.1%} of exposure variance lies between regions"
+
+    return VariationDiagnostic(
+        between_region_share=share,
+        regions=regions,
+        distinct_values_per_region=distinct,
+        identifying=identifying,
+        detail=detail,
+    )
+
+
+def require_regional_variation(
+    frame: pd.DataFrame,
+    *,
+    value_column: str = "cost_exposure",
+    region_column: str = "region",
+    minimum_share: float = 0.01,
+) -> VariationDiagnostic:
+    """Refuse to proceed with an exposure that cannot identify a regional effect.
+
+    Args:
+        frame: Exposure measure by region.
+        value_column: Column holding the exposure.
+        region_column: Column identifying the region.
+        minimum_share: Smallest between-region variance share accepted.
+
+    Returns:
+        The diagnostic, when it passes.
+
+    Raises:
+        ExposureError: If the exposure carries no usable regional variation.
+    """
+    diagnostic = assess_identifying_variation(
+        frame,
+        value_column=value_column,
+        region_column=region_column,
+        minimum_share=minimum_share,
+    )
+    if not diagnostic.identifying:
+        raise ExposureError(
+            f"exposure cannot identify a regional effect: {diagnostic.detail}. "
+            "A region-by-industry measure requires a joint distribution of employment "
+            "over regions and industries; separate regional and industry totals are "
+            "not sufficient, because assuming they are independent makes every region "
+            "identical."
+        )
+    return diagnostic
