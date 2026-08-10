@@ -31,7 +31,10 @@ _STRUCTURAL = re.compile(
 _MACRO_USE = re.compile(r"\\([A-Za-z]+)\{?\}?")
 _MACRO_DEF = re.compile(r"\\(?:new|provide)command\{\\([A-Za-z]+)\}")
 _BIB_ENTRY = re.compile(r"@\w+\{([^,]+),")
-_CITE = re.compile(r"\\cite[a-z]*\{([^}]+)\}")
+# natbib commands may be capitalised (\Citet) and may carry optional arguments
+# before the key list (\citep[see][p. 3]{key}). Missing either form would let a
+# citation with no bibliography entry pass the very check meant to catch it.
+_CITE = re.compile(r"\\[Cc]ite[a-zA-Z]*(?:\[[^\]]*\])*\{([^}]+)\}")
 
 
 def _generated_macros() -> set[str]:

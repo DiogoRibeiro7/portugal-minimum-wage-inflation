@@ -256,6 +256,7 @@ def write_headline_macros(macro: pd.DataFrame, path: Path) -> Path:
     first = macro.iloc[0]
     last = macro.iloc[-1]
     residual = macro["policy_residual"].dropna()
+    gap = float(macro["cumulative_policy_gap"].iloc[-1])
     trough = macro["minimum_wage_to_productivity_index"].astype(float)
     trough_year = int(macro["year"].astype(int).to_numpy()[int(trough.to_numpy().argmin())])
 
@@ -271,7 +272,12 @@ def write_headline_macros(macro: pd.DataFrame, path: Path) -> Path:
         # The compounded gap, not the sum of annual residuals. Summing them
         # over fifty years at Portuguese inflation rates gives a figure beyond
         # -100 per cent, which cannot be read as a cumulative shortfall.
-        "CumulativeGapPct": f"{float(macro['cumulative_policy_gap'].iloc[-1]) * 100:+.1f}",
+        # Emitted as an unsigned magnitude with a separate direction word. A
+        # signed macro placed next to a hard-coded "below" reads as a double
+        # negative, and would invert the claim outright if the sign ever flipped.
+        "CumulativeGapPct": f"{gap * 100:+.1f}",
+        "CumulativeGapMagnitudePct": f"{abs(gap) * 100:.1f}",
+        "CumulativeGapDirection": "below" if gap < 0 else "above",
         "SummedResidualPct": f"{residual.sum() * 100:+.1f}",
         "ObservedYears": f"{len(macro)}",
     }
