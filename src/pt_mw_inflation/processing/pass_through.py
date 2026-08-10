@@ -62,6 +62,7 @@ def monthly_statutory_wage(
     *,
     geography: str,
     fallback: pd.Series | None = None,
+    gap_years: frozenset[int] | None = None,
 ) -> pd.Series:
     """Step the statutory wage for one geography onto a monthly index.
 
@@ -69,9 +70,16 @@ def monthly_statutory_wage(
         panel: Statutory panel, general regime.
         months: Months to evaluate.
         geography: Geography to extract.
-        fallback: Series used where the geography has no act in force. The
-            autonomous regions are governed by the national wage until their own
-            legislation takes effect, so the national series is the fallback.
+        fallback: Series used where the geography has no act of its own in
+            force. This applies to interior gaps as well as to months before the
+            first act, and the distinction matters: a region that legislated in
+            a year whose act is not registered would otherwise be held at its
+            last known level while the national wage rose, which is
+            indistinguishable from a deliberate freeze and enters the estimation
+            as a policy shock that never happened.
+        gap_years: Years in which this geography is known to have legislated
+            without the act being registered. Those months take the fallback
+            rather than the carried-forward level.
 
     Returns:
         The wage in force in each month.
@@ -84,7 +92,12 @@ def monthly_statutory_wage(
         raise PassThroughError(f"no acts for {geography} and no fallback supplied")
 
     if selected.empty:
-        return pd.Series(fallback, index=months)
+        if fallback is None:
+            raise PassThroughError(f"no acts for {geography} and no fallback supplied")
+        stepped = pd.Series(fallback, index=months).reindex(months)
+        if stepped.isna().any():
+            raise PassThroughError(f"fallback does not cover every month for {geography}")
+        return stepped
 
     dates = pd.to_datetime(selected["effective_date"]).to_numpy()
     levels = selected["minimum_wage_monthly_eur"].to_numpy(dtype=float)
@@ -92,6 +105,13 @@ def monthly_statutory_wage(
     stepped = pd.Series(
         np.where(positions >= 0, levels[np.clip(positions, 0, None)], np.nan), index=months
     )
+
+    if gap_years:
+        # A registered act cannot speak for a year it does not cover. Rather
+        # than carry the previous level across a known hole, defer to the
+        # fallback so the hole cannot masquerade as a frozen wage.
+        in_gap = pd.Series(months.year, index=months).isin(gap_years)
+        stepped = stepped.mask(in_gap)
 
     if fallback is not None:
         stepped = stepped.fillna(pd.Series(fallback, index=months))
@@ -106,6 +126,7 @@ def build_regional_shock(
     regions: list[str],
     *,
     national: str = "PT",
+    gap_years: dict[str, frozenset[int]] | None = None,
 ) -> pd.DataFrame:
     """Build the applicable statutory wage and its log change for each region.
 
@@ -114,6 +135,8 @@ def build_regional_shock(
         months: Months to cover.
         regions: NUTS codes to build the shock for.
         national: Geography supplying the mainland wage and the fallback.
+        gap_years: Per-region years known to be missing from the register,
+            which take the national wage rather than a carried-forward level.
 
     Returns:
         Columns `nuts_code`, `month`, `minimum_wage`, `delta_log_minimum_wage`.
@@ -127,7 +150,13 @@ def build_regional_shock(
     for region in regions:
         has_own = (wage_panel["geography"] == region).any()
         wage = (
-            monthly_statutory_wage(wage_panel, months, geography=region, fallback=national_wage)
+            monthly_statutory_wage(
+                wage_panel,
+                months,
+                geography=region,
+                fallback=national_wage,
+                gap_years=(gap_years or {}).get(region),
+            )
             if has_own
             else national_wage
         )
@@ -138,7 +167,11 @@ def build_regional_shock(
                 "minimum_wage": wage.to_numpy(dtype=float),
             }
         )
-        block["delta_log_minimum_wage"] = np.log(block["minimum_wage"]).diff().fillna(0.0)
+        # The first month has no predecessor, so its change is undefined rather
+        # than zero. Filling it with zero would silently drop an act effective
+        # in exactly that month, which is where a region's divergence lives.
+        block["delta_log_minimum_wage"] = np.log(block["minimum_wage"]).diff()
+        block.loc[block.index[0], "delta_log_minimum_wage"] = np.nan
         blocks.append(block)
 
     return pd.concat(blocks, ignore_index=True)
@@ -162,6 +195,9 @@ def count_identifying_events(shock: pd.DataFrame, *, national: str = "PT") -> Va
     Raises:
         PassThroughError: If the reference region is absent.
     """
+    if shock.empty:
+        raise PassThroughError("shock frame is empty; nothing to compare")
+
     reference = shock.loc[shock["nuts_code"] == national]
     if reference.empty:
         # The mainland regions all carry the national change, so any of them

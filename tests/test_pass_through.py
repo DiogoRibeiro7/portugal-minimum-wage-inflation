@@ -157,10 +157,16 @@ def test_category_interactions_cover_every_category_exactly_once() -> None:
     interacted, names = add_category_interactions(panel)
 
     assert len(names) == panel["category_code"].nunique()
-    loadings = interacted[names].ne(0).sum(axis=1)
-    # A row is non-zero on at most its own category, and zero everywhere when
-    # the wage did not change that month.
+
+    # The first month of each series has no predecessor, so its change is NaN
+    # rather than zero and its interactions are NaN too. Estimation drops those
+    # rows, so the loading check is made on the sample that is actually used.
+    estimable = interacted.dropna(subset=["delta_log_minimum_wage"])
+    loadings = estimable[names].ne(0).sum(axis=1)
+    # A row loads on at most its own category, and on none at all in a month
+    # when the wage did not change.
     assert loadings.max() <= 1
+    assert len(estimable) < len(interacted)
 
 
 def test_missing_price_columns_are_reported() -> None:

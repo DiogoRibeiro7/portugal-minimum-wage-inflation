@@ -36,11 +36,16 @@ regional:
     name: Região Autónoma da Madeira
     jurisdiction: m
     mechanism: explicit_value
-    # Madeira has legislated its own value since at least 2010, and the acts for
-    # 2010-2018, 2021 and 2022 are not yet registered here. Each must be added
-    # with its citation rather than inferred, so the regional series currently
-    # falls back to the national wage in those years and the design's
-    # identifying variation is narrower than the region's history allows.
+    # Madeira has legislated its own value since at least 2010; the acts for
+    # 2010-2018, 2021 and 2022 are not yet registered. Each must be added with
+    # its citation rather than inferred.
+    #
+    # These years are declared as gaps because a hole in the register is not
+    # neutral. Without the declaration the last registered level is carried
+    # across the hole while the national wage rises, which is indistinguishable
+    # from a deliberate freeze and enters the estimation as a policy shock that
+    # never happened. Declared gaps take the national wage instead.
+    gap_years: [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2021, 2022]
     acts:
       - {act_type: declegreg, number: 1, act_date: 2019-02-15, effective_date: 2019-01-01}
       - {act_type: declegreg, number: 2, act_date: 2020-03-03, effective_date: 2020-01-01}
