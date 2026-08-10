@@ -173,8 +173,14 @@ def download_source(
             status = "unchanged"
         else:
             status = "changed"
+            # The timestamp is only second-resolution, so the digest of the
+            # superseded bytes is appended: two revisions within one second
+            # would otherwise collide and silently overwrite the earlier
+            # snapshot, destroying the evidence this branch exists to keep.
             stamp = retrieved_at.strftime("%Y%m%dT%H%M%SZ")
-            snapshot = destination.with_name(f"{destination.stem}.{stamp}{destination.suffix}")
+            snapshot = destination.with_name(
+                f"{destination.stem}.{stamp}.{previous_digest[:12]}{destination.suffix}"
+            )
             destination.replace(snapshot)
             snapshot_path = snapshot.relative_to(root)
 

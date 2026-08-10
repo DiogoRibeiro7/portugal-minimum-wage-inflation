@@ -338,8 +338,16 @@ def _retain(
             status = "unchanged"
         else:
             status = "changed"
+            # The digest of the superseded bytes disambiguates two revisions
+            # within the same second, which a timestamp alone would collide and
+            # silently overwrite -- destroying exactly the evidence this branch
+            # exists to keep. Identical bytes yield an identical name, so the
+            # only collision left loses nothing.
             stamp = retrieved_at.strftime("%Y%m%dT%H%M%SZ")
-            moved = destination.with_name(f"{destination.stem}.{stamp}{destination.suffix}")
+            superseded = sha256_bytes(destination.read_bytes())[:12]
+            moved = destination.with_name(
+                f"{destination.stem}.{stamp}.{superseded}{destination.suffix}"
+            )
             destination.replace(moved)
             snapshot = moved.name
 
