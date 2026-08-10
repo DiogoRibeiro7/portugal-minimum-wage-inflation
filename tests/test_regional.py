@@ -172,6 +172,7 @@ def test_regional_panel_applies_each_mechanism(monkeypatch: pytest.MonkeyPatch) 
     registry = {
         "madeira": {
             "geography": "PT30",
+            "jurisdiction": "m",
             "mechanism": "explicit_value",
             "acts": [
                 {
@@ -184,6 +185,7 @@ def test_regional_panel_applies_each_mechanism(monkeypatch: pytest.MonkeyPatch) 
         },
         "azores": {
             "geography": "PT20",
+            "jurisdiction": "a",
             "mechanism": "proportional_supplement",
             "supplement_act": {
                 "act_type": "declegreg",
@@ -208,8 +210,19 @@ def test_regional_panel_applies_each_mechanism(monkeypatch: pytest.MonkeyPatch) 
 
 def test_unknown_mechanism_is_rejected() -> None:
     """A region must declare how its wage is set."""
-    registry = {"nowhere": {"geography": "PTXX", "mechanism": "vibes"}}
+    registry = {"nowhere": {"geography": "PTXX", "jurisdiction": "m", "mechanism": "vibes"}}
     with pytest.raises(RegionalScheduleError, match="unknown mechanism"):
+        build_regional_panel(registry, _national_panel())
+
+
+def test_region_without_a_jurisdiction_is_rejected() -> None:
+    """The ELI jurisdiction must be declared, not inferred from the key name.
+
+    Regional decrees are numbered per region, so fetching the wrong
+    jurisdiction returns a real but unrelated act and succeeds silently.
+    """
+    registry = {"madeira": {"geography": "PT30", "mechanism": "explicit_value", "acts": []}}
+    with pytest.raises(RegionalScheduleError, match="declares no jurisdiction"):
         build_regional_panel(registry, _national_panel())
 
 
@@ -247,3 +260,141 @@ def test_premium_requires_the_national_series() -> None:
     """Comparing against a frame without the national wage is an error."""
     with pytest.raises(RegionalScheduleError, match="missing columns"):
         regional_premium(pd.DataFrame(), pd.DataFrame({"year": [2024]}))
+
+
+def test_national_series_is_not_contaminated_by_regional_rows() -> None:
+    """Filtering on scope alone would return a regional wage as the national one.
+
+    The panel holds the mainland and both autonomous regions under the same
+    general regime. Before the geography filter existed, collapsing the panel
+    silently returned the Azores or Madeira level as the national wage for every
+    year a region legislated, with no error anywhere.
+    """
+    from pt_mw_inflation.processing.minimum_wage import annual_minimum_wage
+
+    panel = pd.DataFrame(
+        [
+            {
+                "geography": "PT",
+                "effective_date": pd.Timestamp("2024-01-01"),
+                "scope": "general",
+                "minimum_wage_monthly_eur": 820.0,
+            },
+            {
+                "geography": "PT20",
+                "effective_date": pd.Timestamp("2024-01-01"),
+                "scope": "general",
+                "minimum_wage_monthly_eur": 861.0,
+            },
+            {
+                "geography": "PT30",
+                "effective_date": pd.Timestamp("2024-01-01"),
+                "scope": "general",
+                "minimum_wage_monthly_eur": 850.0,
+            },
+        ]
+    )
+
+    for geography, expected in (("PT", 820.0), ("PT20", 861.0), ("PT30", 850.0)):
+        series = annual_minimum_wage(panel, scope="general", geography=geography)
+        assert float(series["minimum_wage_january"].iloc[0]) == expected
+
+
+def test_unknown_geography_names_what_is_available() -> None:
+    """Asking for an absent geography must say which ones exist."""
+    from pt_mw_inflation.processing.minimum_wage import annual_minimum_wage
+
+    panel = pd.DataFrame(
+        [
+            {
+                "geography": "PT",
+                "effective_date": pd.Timestamp("2024-01-01"),
+                "scope": "general",
+                "minimum_wage_monthly_eur": 820.0,
+            }
+        ]
+    )
+    with pytest.raises(ValueError, match="geographies present"):
+        annual_minimum_wage(panel, scope="general", geography="PT20")
+
+
+def test_supplements_are_not_added_twice() -> None:
+    """A registered act that the summary page starts listing must not duplicate.
+
+    Two rows on one date for one regime make the reconciliation check report a
+    spurious zero-per-cent increase against a stated one.
+    """
+    from pt_mw_inflation.data.dgert import StatutoryChange
+    from pt_mw_inflation.processing.regional import merge_supplements
+
+    existing = StatutoryChange(
+        legal_source="DGERT row",
+        effective_date=date(2000, 1, 1),
+        scope="general",
+        amount_eur=Decimal("318.23"),
+        original_amount=Decimal("63800"),
+        original_currency="PTE",
+        stated_percent_change=None,
+    )
+    duplicate = StatutoryChange(
+        legal_source="Decreto-Lei n.º 573/99",
+        effective_date=date(2000, 1, 1),
+        scope="general",
+        amount_eur=Decimal("318.23"),
+        original_amount=Decimal("63800"),
+        original_currency="PTE",
+        stated_percent_change=None,
+    )
+    fresh = StatutoryChange(
+        legal_source="Decreto-Lei n.º 573/99",
+        effective_date=date(2000, 1, 1),
+        scope="domestic_service",
+        amount_eur=Decimal("299.28"),
+        original_amount=Decimal("60000"),
+        original_currency="PTE",
+        stated_percent_change=None,
+    )
+
+    merged = merge_supplements([existing], [duplicate, fresh])
+    assert len(merged) == 2
+    assert merged[0].legal_source == "DGERT row"
+
+
+def test_conflicting_amounts_are_reported_not_guessed() -> None:
+    """If the operative phrase appears twice with different values, stop.
+
+    Silently preferring the first or the last occurrence would return a wrong
+    wage whenever a revocation clause quotes the superseded value.
+    """
+    text = (
+        "O valor da retribuicao minima mensal garantida para vigorar e de 850 €. "
+        "Fica revogado o diploma que fixava o valor da retribuicao minima mensal "
+        "garantida para vigorar em 785 €."
+    )
+    with pytest.raises(ValueError, match="conflicting amounts"):
+        extract_minimum_wage(_act(text, act_type="declegreg", jurisdiction="m"))
+
+
+def test_premium_carries_a_region_forward_through_silent_years() -> None:
+    """A region that does not legislate keeps its level while national rises.
+
+    Those are precisely the years the premium narrows, so dropping them would
+    make the premium look more stable than it is.
+    """
+    regional = pd.DataFrame(
+        [
+            {
+                "geography": "PT30",
+                "effective_date": pd.Timestamp("2024-01-01"),
+                "minimum_wage_monthly_eur": 850.0,
+                "legal_source": "DLR 3/2024/M",
+            }
+        ]
+    )
+    national_annual = pd.DataFrame({"year": [2024, 2025], "minimum_wage_january": [820.0, 870.0]})
+    premium = regional_premium(regional, national_annual).set_index("year")
+
+    assert set(premium.index) == {2024, 2025}
+    assert premium.loc[2025, "minimum_wage_monthly_eur"] == 850.0
+    # The region fell behind: 850 against a national 870.
+    assert premium.loc[2025, "premium"] < 0

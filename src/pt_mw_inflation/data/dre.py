@@ -29,10 +29,9 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-import requests
 from pypdf import PdfReader
 
-from pt_mw_inflation.data.http import USER_AGENT
+from pt_mw_inflation.data.http import fetch
 
 ELI_BASE = "https://data.dre.pt/eli"
 
@@ -57,7 +56,7 @@ _EURO_PATTERNS = (
 )
 
 #: The regional supplement, as stated in the article that fixes it.
-_SUPPLEMENT_PATTERN = re.compile(r"acrescimo de\s*(\d{1,2}(?:,\d+)?)\s*%")
+_SUPPLEMENT_PATTERN = re.compile(r"acrescimo de\s*(\d{1,2}(?:,\d+)?)\s*%", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -81,8 +80,13 @@ class LegalAct:
             "port": "Portaria",
         }[self.act_type]
         suffix = {"p": "", "m": "/M", "a": "/A"}[self.jurisdiction]
-        year = self.act_date.year if self.act_type == "declegreg" else self.act_date.year % 100
-        formatted = f"{year:02d}" if self.act_type != "declegreg" else f"{year}"
+        # Portuguese citations abbreviate the year for last-century acts and
+        # write it in full from 2000, which is also how the DGERT history
+        # renders them; matching that keeps the two comparable.
+        if self.act_type == "declegreg" or self.act_date.year >= 2000:
+            formatted = f"{self.act_date.year}"
+        else:
+            formatted = f"{self.act_date.year % 100:02d}"
         return (
             f"{label} n.º {self.number}/{formatted}{suffix} "
             f"de {self.act_date.day} de {_MONTHS[self.act_date.month]} de {self.act_date.year}"
@@ -153,12 +157,17 @@ def parse_amounts(text: str) -> list[tuple[Decimal, Literal["PTE", "EUR"]]]:
         digits = match.group(1).replace(" ", "").replace(".", "")
         found.append((match.start(), Decimal(digits), "PTE"))
 
-    seen: set[int] = set()
+    # Patterns overlap: "€ 980,00" is matched by the sign-first rule, and a
+    # figure followed by a sign by the second. Keying on the start offset alone
+    # would let one amount be recorded twice, which shifts every position that
+    # amount_index selects from.
+    claimed: list[tuple[int, int]] = []
     for pattern in _EURO_PATTERNS:
         for match in pattern.finditer(text):
-            if match.start() in seen:
+            span = match.span()
+            if any(span[0] < end and start < span[1] for start, end in claimed):
                 continue
-            seen.add(match.start())
+            claimed.append(span)
             digits = match.group(1).replace(" ", "").replace(".", "").replace(",", ".")
             found.append((match.start(), Decimal(digits), "EUR"))
 
@@ -192,8 +201,9 @@ def fetch_act(
             but with the application shell.
     """
     url = eli_url(act_type, number, act_date, jurisdiction=jurisdiction)
-    response = requests.get(url, timeout=timeout_seconds, headers={"User-Agent": USER_AGENT})
-    response.raise_for_status()
+    # Shared retry policy: the gazette occasionally answers 503, and a build
+    # that reads primary law must not fail on one transient response.
+    response = fetch(url, timeout_seconds=timeout_seconds)
 
     media_type = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
     if media_type != "application/pdf":
@@ -246,12 +256,27 @@ def extract_minimum_wage(act: LegalAct) -> tuple[Decimal, Literal["PTE", "EUR"]]
         "no valor de",
     )
     for marker in markers:
-        position = lowered.rfind(marker)
-        if position < 0:
-            continue
-        amounts = parse_amounts(act.text[position : position + 400])
-        if amounts:
-            return amounts[0]
+        # Every occurrence is considered, not just one. The operative article is
+        # usually last, but a revocation clause may quote the superseded value,
+        # and silently preferring either position would return a wrong wage with
+        # no warning. Disagreement is reported instead of resolved.
+        candidates = []
+        start = lowered.find(marker)
+        while start >= 0:
+            amounts = parse_amounts(act.text[start : start + 400])
+            if amounts:
+                candidates.append(amounts[0])
+            start = lowered.find(marker, start + 1)
+
+        distinct = set(candidates)
+        if len(distinct) == 1:
+            return candidates[0]
+        if len(distinct) > 1:
+            raise ValueError(
+                f"{act.citation} states conflicting amounts after {marker!r}: "
+                f"{sorted(distinct)}. The operative article cannot be identified "
+                "unambiguously."
+            )
 
     raise ValueError(
         f"no monetary amount found near the operative wording of {act.citation}; "
@@ -277,7 +302,9 @@ def extract_regional_supplement(act: LegalAct) -> Decimal:
     """
     lowered = act.text.lower()
     position = lowered.find("acrescimo regional ao salario minimo")
-    window = act.text[position:] if position >= 0 else act.text
+    # Search the same string the anchor was found in: the article heading may be
+    # capitalised, and the pension bands preceding it quote other percentages.
+    window = lowered[position:] if position >= 0 else lowered
     match = _SUPPLEMENT_PATTERN.search(window)
     if match is None:
         raise ValueError(f"no regional supplement stated in {act.citation}")

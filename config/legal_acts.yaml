@@ -34,6 +34,7 @@ regional:
   madeira:
     geography: PT30
     name: Região Autónoma da Madeira
+    jurisdiction: m
     mechanism: explicit_value
     acts:
       - {act_type: declegreg, number: 11, act_date: 2023-02-14, effective_date: 2023-01-01}
@@ -44,6 +45,7 @@ regional:
   azores:
     geography: PT20
     name: Região Autónoma dos Açores
+    jurisdiction: a
     mechanism: proportional_supplement
     # Article 3 fixes the supplement over the national wage. The regional series
     # is derived from the national one by this rule rather than parsed from

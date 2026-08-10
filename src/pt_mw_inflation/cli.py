@@ -32,6 +32,7 @@ from pt_mw_inflation.processing.minimum_wage import (
 )
 from pt_mw_inflation.processing.regional import (
     build_regional_panel,
+    merge_supplements,
     supplementary_statutory_changes,
 )
 
@@ -90,7 +91,9 @@ def build_minimum_wage(
 
     registry = yaml.safe_load((root / "config/legal_acts.yaml").read_text(encoding="utf-8"))
     changes = parse_minimum_wage_history(raw.read_bytes().decode("utf-8"))
-    changes += supplementary_statutory_changes(registry.get("national_supplements", []))
+    changes = merge_supplements(
+        changes, supplementary_statutory_changes(registry.get("national_supplements", []))
+    )
     panel = build_statutory_panel(changes)
 
     regional = build_regional_panel(registry["regional"], panel[panel["scope"] == "general"])
@@ -104,8 +107,11 @@ def build_minimum_wage(
     for scope, count in panel["scope"].value_counts().sort_index().items():
         typer.echo(f"  {scope}: {count} acts")
 
-    for geography, count in regional["geography"].value_counts().sort_index().items():
-        typer.echo(f"  {geography}: {count} regional acts")
+    if regional.empty:
+        typer.echo("  no regional acts configured")
+    else:
+        for geography, count in regional["geography"].value_counts().sort_index().items():
+            typer.echo(f"  {geography}: {count} regional acts")
 
     unexplained = find_unexplained_jumps(changes)
     for scope, effective in unexplained:
@@ -147,15 +153,27 @@ def build_macro(
     if not raw.exists():
         raise typer.BadParameter(f"{source} not found; run 'ptmw data download-sources' first")
 
-    panel = build_statutory_panel(parse_minimum_wage_history(raw.read_bytes().decode("utf-8")))
-    wages = reconcile_annual_with_eurostat(
-        annual_minimum_wage(panel, scope="general"), fetch_eurostat_minimum_wage()
+    registry = yaml.safe_load((root / "config/legal_acts.yaml").read_text(encoding="utf-8"))
+    changes = parse_minimum_wage_history(raw.read_bytes().decode("utf-8"))
+    # Acts the summary page omits are read from the gazette, so the macro layer
+    # rests on the same primary sources as the statutory panel instead of
+    # falling back on a secondary compiler.
+    changes = merge_supplements(
+        changes, supplementary_statutory_changes(registry.get("national_supplements", []))
     )
+    panel = build_statutory_panel(changes)
+
+    wages = reconcile_annual_with_eurostat(
+        annual_minimum_wage(panel, scope="general", geography="PT"),
+        fetch_eurostat_minimum_wage(),
+    )
+    # Reconciliation is now a check rather than a source: with every act
+    # registered it should find nothing to correct.
     corrected = wages.loc[wages["minimum_wage_source"] != "DGERT statutory history", "year"]
     for year in corrected:
-        typer.echo(
-            f"  {int(year)}: act absent from the national history; level taken from Eurostat"
-        )
+        typer.echo(f"  {int(year)}: no act registered; level taken from Eurostat")
+    if corrected.empty:
+        typer.echo("  every year is sourced to an act; Eurostat agrees throughout")
 
     prices = fetch_indicator()
     productivity = ameco_to_frame(
