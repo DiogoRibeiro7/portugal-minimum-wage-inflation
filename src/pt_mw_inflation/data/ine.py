@@ -19,16 +19,18 @@ history to a few dozen calls rather than one per month.
 
 from __future__ import annotations
 
+import json
 import time
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import requests
 
-from pt_mw_inflation.data.http import USER_AGENT
+from pt_mw_inflation.data.http import USER_AGENT, sha256_bytes
 
 INE_API = "https://www.ine.pt/ine/json_indicador/pindica.jsp"
-INE_META_API = "https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp"
 
 #: Consumer price index, base 2025, by NUTS II (2024) and consumption purpose,
 #: monthly from January 1991.
@@ -131,8 +133,16 @@ def parse_period_label(label: str) -> pd.Timestamp:
     return pd.Timestamp(year=int(year.strip()), month=number, day=1)
 
 
-def _request(params: dict[str, str], *, attempts: int = 8, timeout_seconds: int = 90) -> Any:
-    """Call the API, retrying the refused connections it returns under load."""
+def _request(
+    params: dict[str, str], *, attempts: int = 8, timeout_seconds: int = 90
+) -> tuple[Any, bytes, str]:
+    """Call the API, retrying the refused connections it returns under load.
+
+    Returns the decoded node, the response bytes exactly as received, and the
+    URL that was actually sent. The bytes are returned rather than re-serialised
+    later because a checksum over a re-serialisation attests to this code, not
+    to what the service returned.
+    """
     last_error: Exception | None = None
     for attempt in range(1, attempts + 1):
         try:
@@ -161,7 +171,7 @@ def _request(params: dict[str, str], *, attempts: int = 8, timeout_seconds: int 
             # A retired or unknown indicator is reported in the body with a 200
             # status, so raise_for_status cannot catch it.
             raise IneError(f"no data returned for {params.get('varcd')}: {str(node)[:200]}")
-        return node
+        return node, response.content, response.url
 
     raise IneError(f"unreachable retry state: {last_error}")
 
@@ -202,6 +212,7 @@ def fetch_regional_cpi(
     indicator: str = REGIONAL_CPI_INDICATOR,
     batch_months: int = 12,
     pause_seconds: float = 1.5,
+    raw_dir: Path | None = None,
 ) -> pd.DataFrame:
     """Fetch the regional consumer price panel.
 
@@ -214,27 +225,43 @@ def fetch_regional_cpi(
             refusing connections when a long history is pulled without pacing,
             so this is what makes a full run complete rather than an increase
             in retries.
+        raw_dir: Directory to retain the raw responses in, with a checksum
+            manifest. The processed panel is derived, and the indicator it comes
+            from is retired without redirect when the series is rebased, so
+            without the raw payloads the panel cannot be reproduced.
 
     Returns:
         Tidy observations with `month`, `nuts_code`, `region`, `category_code`,
         `category`, `price_index` and `is_aggregate`.
 
     Raises:
-        IneError: If the API fails or returns no observations.
+        IneError: If the API fails, returns no observations, or is asked for a
+            non-positive batch size.
     """
+    if batch_months < 1:
+        raise IneError(f"batch_months must be positive, got {batch_months}")
     if end is None:
         previous = pd.Timestamp.today().to_period("M") - 1
         end = f"{previous.year}-{previous.month:02d}"
 
     periods = monthly_periods(start, end)
     records: list[dict[str, Any]] = []
+    provenance: list[dict[str, Any]] = []
 
     for index in range(0, len(periods), batch_months):
         if index and pause_seconds:
             time.sleep(pause_seconds)
         batch = periods[index : index + batch_months]
-        node = _request({"op": "2", "varcd": indicator, "Dim1": ",".join(batch), "lang": "PT"})
+        params = {"op": "2", "varcd": indicator, "Dim1": ",".join(batch), "lang": "PT"}
+        node, payload, sent_url = _request(params)
         records.extend(parse_observations(node))
+
+        if raw_dir is not None:
+            provenance.append(_retain(payload, sent_url, indicator, raw_dir, batch))
+
+    if raw_dir is not None and provenance:
+        manifest = raw_dir / "regional_cpi_manifest.json"
+        manifest.write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
 
     if not records:
         raise IneError(f"indicator {indicator} returned no observations for {start}..{end}")
@@ -244,3 +271,104 @@ def fetch_regional_cpi(
     frame["is_aggregate"] = frame["nuts_code"].isin(AGGREGATE_GEOGRAPHIES)
 
     return frame.sort_values(["nuts_code", "category_code", "month"]).reset_index(drop=True)
+
+
+#: Fields the API stamps per response rather than per observation. They change
+#: on every call, so comparing raw bytes would report every re-run as a revision.
+VOLATILE_FIELDS = ("DataExtracao",)
+
+
+def content_digest(payload: bytes) -> str:
+    """Digest the substantive content of a response, ignoring per-call stamps.
+
+    The response carries an extraction timestamp, so two identical requests
+    never produce identical bytes. Detecting revisions on the raw bytes would
+    therefore snapshot every batch on every run, filling the raw directory with
+    duplicates and burying the signal that a revision actually happened.
+
+    Args:
+        payload: Response bytes as received.
+
+    Returns:
+        A digest over the response with the per-call stamps removed. Falls back
+        to the raw digest when the payload is not the expected JSON.
+    """
+    try:
+        node = json.loads(payload)
+    except ValueError:
+        return sha256_bytes(payload)
+
+    if isinstance(node, list) and node and isinstance(node[0], dict):
+        node[0] = {key: value for key, value in node[0].items() if key not in VOLATILE_FIELDS}
+    return sha256_bytes(json.dumps(node, sort_keys=True, ensure_ascii=False).encode("utf-8"))
+
+
+def _retain(
+    payload: bytes, sent_url: str, indicator: str, raw_dir: Path, batch: list[str]
+) -> dict[str, Any]:
+    """Write one raw response to disk and return its provenance record.
+
+    The bytes are stored exactly as received, and ``sha256`` is taken over them:
+    hashing a re-serialisation would attest to this module's JSON writer rather
+    than to what the service returned.
+
+    A re-run must not destroy what it replaces. The default range starts in
+    1991, so every run revisits every batch, and overwriting in place would
+    erase the payload behind an already-published panel precisely when INE
+    revises or rebases a series -- the scenario this retention exists for. A
+    changed payload is therefore moved aside under a timestamp first, matching
+    how :func:`pt_mw_inflation.data.http.download_source` treats raw files.
+
+    Revision is judged on :func:`content_digest`, not on the raw bytes, because
+    of the per-call extraction stamp. Comparing bytes marks every re-run as a
+    revision, which is both useless and destructive of the signal it exists to
+    give.
+    """
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    destination = raw_dir / f"regional_cpi_{batch[0]}_{batch[-1]}.json"
+    digest = sha256_bytes(payload)
+    content = content_digest(payload)
+    retrieved_at = datetime.now(UTC)
+
+    status = "created"
+    snapshot: str | None = None
+    if destination.exists():
+        previous = content_digest(destination.read_bytes())
+        if previous == content:
+            status = "unchanged"
+        else:
+            status = "changed"
+            # The digest of the superseded bytes disambiguates two revisions
+            # within the same second, which a timestamp alone would collide and
+            # silently overwrite -- destroying exactly the evidence this branch
+            # exists to keep. Identical bytes yield an identical name, so the
+            # only collision left loses nothing.
+            stamp = retrieved_at.strftime("%Y%m%dT%H%M%SZ")
+            superseded = sha256_bytes(destination.read_bytes())[:12]
+            moved = destination.with_name(
+                f"{destination.stem}.{stamp}.{superseded}{destination.suffix}"
+            )
+            destination.replace(moved)
+            snapshot = moved.name
+
+    if status == "unchanged":
+        # The retained file keeps the bytes from the run that created it, which
+        # differ from this response in the per-call stamp alone. The manifest
+        # must describe the file on disk, not the payload that was discarded,
+        # or its checksum would fail to verify against what it names.
+        digest = sha256_bytes(destination.read_bytes())
+    else:
+        destination.write_bytes(payload)
+
+    return {
+        "file": destination.name,
+        "indicator": indicator,
+        "periods": batch,
+        "url": sent_url,
+        "retrieved_at_utc": retrieved_at.isoformat(),
+        "sha256": digest,
+        "content_sha256": content,
+        "bytes": len(payload),
+        "status": status,
+        "snapshot": snapshot,
+    }

@@ -218,3 +218,33 @@ def test_repository_registry_is_valid() -> None:
         assert spec.licence != "unknown" or not spec.enabled
         if not spec.enabled:
             assert spec.unavailable_reason
+
+
+def test_two_revisions_in_the_same_second_keep_both_snapshots(tmp_path: Path) -> None:
+    """Rapid successive revisions must not overwrite each other's evidence.
+
+    The snapshot name carries a second-resolution timestamp. Two revisions of
+    one source inside the same second would collide on that name alone, and the
+    second would silently replace the first -- destroying exactly the retained
+    payload this branch exists to preserve. The digest of the superseded bytes
+    disambiguates them.
+    """
+    versions = [b"PK\x03\x04version-one", b"PK\x03\x04version-two", b"PK\x03\x04version-three"]
+    snapshots: list[Path] = []
+
+    for payload in versions:
+        record = download_source(
+            "example",
+            _spec(),
+            tmp_path,
+            session=FakeSession(FakeResponse(payload, XLSX_MEDIA)),  # type: ignore[arg-type]
+        )
+        if record.snapshot_path is not None:
+            snapshots.append(tmp_path / record.snapshot_path)
+
+    assert len(snapshots) == 2
+    assert len({path.name for path in snapshots}) == 2, "snapshots collided"
+    # Every superseded version is still readable.
+    retained = {path.read_bytes() for path in snapshots}
+    assert retained == set(versions[:-1])
+    assert (tmp_path / "data/raw/example/book.xlsx").read_bytes() == versions[-1]

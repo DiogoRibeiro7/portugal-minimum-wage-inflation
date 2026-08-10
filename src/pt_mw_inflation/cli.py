@@ -84,7 +84,7 @@ def data_ine_cpi(
 ) -> None:
     """Download the regional consumer price panel from Statistics Portugal."""
     root = _repo_root()
-    frame = fetch_regional_cpi(start=start, end=end or None)
+    frame = fetch_regional_cpi(start=start, end=end or None, raw_dir=root / "data/raw/ine")
 
     destination = root / output
     destination.parent.mkdir(parents=True, exist_ok=True)
