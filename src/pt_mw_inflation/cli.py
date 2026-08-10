@@ -195,7 +195,7 @@ def build_regional_exposure(
     # at a year only half of it was frozen at. The download now stamps its year
     # and this refuses the mismatch.
     try:
-        population, _ = require_matched_inputs(
+        population = require_matched_inputs(
             regional_employment, national_employment, baseline_year=baseline_year
         )
     except RegionalEmploymentError as error:

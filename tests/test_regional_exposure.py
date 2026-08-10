@@ -331,8 +331,14 @@ def _stamped(population: str, year: int = 2015) -> tuple[pd.DataFrame, pd.DataFr
 
 def test_matched_inputs_accept_either_population_consistently_used() -> None:
     """Both bases are admissible; mixing them is what is not."""
-    for population, expected in (("employees", ("SAL", "SAL_DC")), ("all", ("EMP", "EMP_DC"))):
+    for population, expected in (
+        ("employees", "employees"),
+        ("all", "all persons in employment"),
+    ):
         regional, national = _stamped(population)
+        # Named, not coded: the two datasets spell the same population
+        # differently, so reporting "both count SAL" beside a frame stamped
+        # SAL_DC reads as a mismatch that has just been accepted.
         assert require_matched_inputs(regional, national, baseline_year=2015) == expected
 
 

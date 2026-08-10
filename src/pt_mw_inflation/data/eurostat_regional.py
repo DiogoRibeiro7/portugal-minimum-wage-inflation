@@ -154,17 +154,33 @@ def fetch_regional_employment(
     return result.reset_index(drop=True)
 
 
-#: The population codes that name the same people in the two datasets. The
-#: regional and national accounts use different vocabularies, so a pairing is
-#: checked against this rather than the two codes compared for equality.
-MATCHED_POPULATIONS = frozenset(
-    {(REGIONAL_EMPLOYEES, "SAL_DC"), (REGIONAL_TOTAL_EMPLOYMENT, "EMP_DC")}
-)
+#: Employees, in the national accounts' vocabulary. The counterpart of
+#: :data:`REGIONAL_EMPLOYEES`, which names the same people under another code.
+#: The bite these weights aggregate is a share of *employees* paid the minimum
+#: wage, so weighting it by a population that also contains the self-employed
+#: would give a sector's bite an influence proportional to a headcount the bite
+#: was never measured over. Agriculture and construction carry far more
+#: self-employment than finance, so the mismatch is not a wash across sectors.
+EMPLOYEES = "SAL_DC"
+
+#: All persons in employment, employees and self-employed together. Retained as
+#: an alternative basis, admissible as long as it is used on both sides.
+TOTAL_EMPLOYMENT = "EMP_DC"
+
+#: The pairings that name the same people in the two datasets, each with the
+#: plain-English name of who that is. The vocabularies differ, so a pairing is
+#: checked against this rather than the two codes compared for equality; and it
+#: is reported by name, because "both count SAL" beside a frame stamped SAL_DC
+#: reads as a mismatch that has just been accepted.
+MATCHED_POPULATIONS: dict[tuple[str, str], str] = {
+    (REGIONAL_EMPLOYEES, EMPLOYEES): "employees",
+    (REGIONAL_TOTAL_EMPLOYMENT, TOTAL_EMPLOYMENT): "all persons in employment",
+}
 
 
 def require_matched_inputs(
     regional: pd.DataFrame, national: pd.DataFrame, *, baseline_year: int
-) -> tuple[str, str]:
+) -> str:
     """Check that composition and weights describe the same people in the same year.
 
     Composition is frozen at ``baseline_year``; the weights were frozen at
@@ -184,7 +200,7 @@ def require_matched_inputs(
         baseline_year: Year the composition is frozen at.
 
     Returns:
-        The matched ``(regional, national)`` population codes.
+        The plain-English name of the population both frames count.
 
     Raises:
         RegionalEmploymentError: If either frame lacks its provenance stamps,
@@ -216,12 +232,13 @@ def require_matched_inputs(
         raise RegionalEmploymentError(f"employment frames mix populations: {populations}")
 
     pairing = (next(iter(populations["regional"])), next(iter(populations["national"])))
-    if pairing not in MATCHED_POPULATIONS:
+    named = MATCHED_POPULATIONS.get(pairing)
+    if named is None:
         raise RegionalEmploymentError(
             f"composition counts {pairing[0]} but the weights count {pairing[1]}; "
             "re-run 'ptmw data regional-employment' so both count the same people"
         )
-    return pairing
+    return named
 
 
 def industry_shares(
@@ -284,20 +301,6 @@ def industry_shares(
 #: aggregate a section-level bite onto the coarser groups the regional accounts
 #: publish, and to see how much of a group has no measured bite at all.
 NATIONAL_EMPLOYMENT_DATASET = "nama_10_a64_e"
-
-
-#: Employees, rather than total employment. The bite these weights aggregate is
-#: a share of *employees* paid the minimum wage, so weighting it by a population
-#: that also contains the self-employed would give a sector's bite an influence
-#: proportional to a headcount the bite was never measured over. Agriculture and
-#: construction carry far more self-employment than finance, so the mismatch is
-#: not a wash across sectors.
-EMPLOYEES = "SAL_DC"
-
-#: Total domestic employment, employees and self-employed together. Retained
-#: because the coverage denominators the exposure builder reports are about all
-#: the workers in a region, not only the employed ones.
-TOTAL_EMPLOYMENT = "EMP_DC"
 
 
 def fetch_national_employment(
