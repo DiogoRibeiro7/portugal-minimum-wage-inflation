@@ -39,6 +39,11 @@ class LocalProjectionEstimate:
     p_value_bootstrap: float
     observations: int
     clusters: int
+    #: Whether the bootstrap enumerated the whole sign space rather than
+    #: sampling it. Recorded rather than inferred from the cluster count,
+    #: because the manuscript states the $p$-value is exact and that claim
+    #: has to come from the run that produced it.
+    bootstrap_exhaustive: bool
 
 
 def build_two_way_design(
@@ -157,6 +162,7 @@ def estimate_panel_local_projections(
                 p_value_bootstrap=bootstrap.p_value,
                 observations=int(len(sample)),
                 clusters=bootstrap.clusters,
+                bootstrap_exhaustive=bootstrap.exhaustive,
             )
         )
 

@@ -26,6 +26,7 @@ category.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -460,6 +461,71 @@ def assess_identifying_variation(
     )
 
 
+@dataclass(frozen=True)
+class VariationStrength:
+    """How much usable spread an exposure measure carries, not merely whether any."""
+
+    coefficient_of_variation: float
+    spread: float
+    interquartile_spread: float
+    regions: int
+    detail: str
+
+
+def measure_variation_strength(
+    frame: pd.DataFrame,
+    *,
+    value_column: str = "regional_bite_exposure",
+    region_column: str = "region",
+) -> VariationStrength:
+    """Quantify the spread of an exposure measure across regions.
+
+    :func:`assess_identifying_variation` answers whether the measure varies at
+    all, which is a precondition and not a recommendation. A measure can take a
+    distinct value in every region and still be too flat to estimate anything
+    from once fixed effects have absorbed the level. This reports the size of
+    the variation so that judgement can be made on a number.
+
+    Args:
+        frame: Exposure by region.
+        value_column: Column holding the exposure.
+        region_column: Column identifying the region.
+
+    Returns:
+        The coefficient of variation, the high-low spread, and the
+        interquartile spread, which is the more robust of the two when one
+        region is unusual.
+
+    Raises:
+        ExposureError: If the columns are absent, fewer than two regions are
+            present, or the mean is zero and the coefficient undefined.
+    """
+    _require_columns("exposure", frame, frozenset({value_column, region_column}))
+
+    values = frame.groupby(region_column)[value_column].mean().astype(float)
+    if values.size < 2:
+        raise ExposureError(f"at least two regions are required, found {values.size}")
+
+    mean = float(values.mean())
+    if mean == 0.0:
+        raise ExposureError("mean exposure is zero; the coefficient of variation is undefined")
+
+    coefficient = float(values.std(ddof=0)) / abs(mean)
+    spread = float(values.max() - values.min())
+    interquartile = float(values.quantile(0.75) - values.quantile(0.25))
+
+    return VariationStrength(
+        coefficient_of_variation=coefficient,
+        spread=spread,
+        interquartile_spread=interquartile,
+        regions=int(values.size),
+        detail=(
+            f"coefficient of variation {coefficient:.3f} across {values.size} regions; "
+            f"high-low spread {spread:.4f}"
+        ),
+    )
+
+
 def require_regional_variation(
     frame: pd.DataFrame,
     *,
@@ -498,39 +564,162 @@ def require_regional_variation(
     return diagnostic
 
 
-def activity_bite_from_registry(registry: dict[str, Any]) -> pd.DataFrame:
-    """Aggregate the published bite to the activity groups employment uses.
+class PredeterminationError(ExposureError):
+    """Raised when an exposure measure postdates the episode it is applied to."""
 
-    The survey reports the bite at a finer activity breakdown than the regional
-    accounts publish employment at, so each group takes the mean of the sections
-    it contains. Groups with no measured section -- agriculture and public
-    administration are outside the survey -- are returned as missing rather than
-    as zero, since an unmeasured bite is not an absent one.
+
+def check_predetermined(
+    registry: dict[str, Any], composition_year: int, first_shock_year: int
+) -> None:
+    """Refuse an exposure measured after the policy episode it is applied to.
+
+    Coverage measured after a wage rise is partly caused by it, which is why the
+    design calls for a predetermined bite. Nothing in the data prevents a 2017
+    bite being applied to a 2015 shock, so the check has to be explicit: the
+    resulting estimate would have the outcome built into the regressor and
+    would look entirely healthy.
+
+    Args:
+        registry: Parsed bite registry, carrying `source.reference_period`.
+        composition_year: Year the regional employment shares are frozen at.
+        first_shock_year: First year of the episode being estimated.
+
+    Raises:
+        PredeterminationError: If either input is dated at or after the first
+            shock, or if the registry states no usable reference period.
+    """
+    period = str(registry.get("source", {}).get("reference_period", ""))
+    match = re.match(r"(\d{4})", period)
+    if match is None:
+        raise PredeterminationError(f"registry states no usable reference_period: {period!r}")
+
+    offending = [
+        f"{name} measured in {year}"
+        for name, year in (("bite", int(match.group(1))), ("composition", composition_year))
+        if year >= first_shock_year
+    ]
+    if offending:
+        raise PredeterminationError(
+            f"exposure is not predetermined for shocks from {first_shock_year}: "
+            + ", ".join(offending)
+            + ". Use an earlier snapshot, or start the window after the exposure was measured."
+        )
+
+
+def activity_bite_from_registry(
+    registry: dict[str, Any], national_employment: pd.DataFrame | None = None
+) -> pd.DataFrame:
+    """Aggregate the published bite onto the groups regional employment uses.
+
+    Each group's bite is the employment-weighted mean of the sections that have
+    one. An unweighted mean would treat manufacturing and a near-zero-bite
+    utility sector as equally large, and they are not.
+
+    Coverage is measured rather than assumed. A group can contain sections the
+    survey never looked at -- public administration sits in the same aggregate
+    as education and health -- and assigning the surveyed sections' bite to the
+    whole group would impute a minimum wage to workers nobody surveyed, while
+    reporting the group as fully covered.
 
     Args:
         registry: Parsed `config/minimum_wage_bite.yaml`.
+        national_employment: Columns `activity` and `employment_thousands` at
+            NACE section level. Omitting it weights sections equally, which is
+            correct only for a group holding a single section.
 
     Returns:
-        Columns `industry` and `minimum_wage_bite`, the bite as a proportion.
+        Columns `industry`, `minimum_wage_bite` and `measured_employment_share`,
+        the last being the fraction of the group's employment the bite was
+        actually measured on.
 
     Raises:
-        ExposureError: If a group names a section the bite table does not carry.
+        ExposureError: If a group names an unknown activity or one with no
+            section mapping, or if employment is supplied but does not cover
+            every section the registry weights.
     """
     bite = registry["bite_by_activity"]
+    section_of = registry["section_of_activity"]
+
+    weights: dict[str, float] = {}
+    weighted_by_employment = national_employment is not None
+    if national_employment is not None:
+        _require_columns(
+            "national_employment",
+            national_employment,
+            frozenset({"activity", "employment_thousands"}),
+        )
+        weights = dict(
+            zip(
+                national_employment["activity"].astype(str),
+                national_employment["employment_thousands"].astype(float),
+                strict=False,
+            )
+        )
+
+        # A section absent from the response would otherwise fall back to a
+        # weight of one thousand workers: not zero, not its true size, and small
+        # enough to look like a rounding artefact in the aggregate. An
+        # incomplete Eurostat response has to be a failure, because the numbers
+        # it produces are wrong in a way nothing downstream can detect.
+        required = {
+            code
+            for block in registry["nace_aggregates"].values()
+            for code in [
+                *block.get("sections", []),
+                *(section_of[name] for name in block.get("measured", []) if name in section_of),
+            ]
+        }
+        absent = sorted(required - weights.keys())
+        if absent:
+            raise ExposureError(
+                f"national employment is missing sections {absent}; "
+                "weighting them by default would silently distort every group they belong to"
+            )
+
     rows = []
-    for group, sections in registry["nace_aggregates"].items():
-        missing = [section for section in sections if section not in bite]
-        if missing:
-            raise ExposureError(f"{group} names unknown activities: {missing}")
-        if not sections:
-            rows.append({"industry": group, "minimum_wage_bite": float("nan")})
+    for group, block in registry["nace_aggregates"].items():
+        measured = list(block.get("measured", []))
+        sections = list(block.get("sections", []))
+
+        unknown = [name for name in measured if name not in bite]
+        if unknown:
+            raise ExposureError(f"{group} names unknown activities: {unknown}")
+        unmapped = [name for name in measured if name not in section_of]
+        if unmapped:
+            raise ExposureError(f"{group} names activities with no section: {unmapped}")
+
+        if not measured:
+            rows.append(
+                {
+                    "industry": group,
+                    "minimum_wage_bite": float("nan"),
+                    "measured_employment_share": 0.0,
+                }
+            )
             continue
+
+        # Without an employment frame every section counts once, which is right
+        # only where a group holds one section. The validation above guarantees
+        # that a supplied frame covers all of them, so the default is reached
+        # only in the unweighted mode.
+        default = 0.0 if weighted_by_employment else 1.0
+        section_weights = [weights.get(section_of[name], default) for name in measured]
+        measured_weight = sum(section_weights)
+        group_weight = sum(weights.get(code, default) for code in sections) or measured_weight
+
+        weighted = (
+            sum(bite[name] * weight for name, weight in zip(measured, section_weights, strict=True))
+            / measured_weight
+            / 100.0
+        )
         rows.append(
             {
                 "industry": group,
-                "minimum_wage_bite": sum(bite[s] for s in sections) / len(sections) / 100.0,
+                "minimum_wage_bite": weighted,
+                "measured_employment_share": min(measured_weight / group_weight, 1.0),
             }
         )
+
     return pd.DataFrame(rows)
 
 
@@ -553,10 +742,12 @@ def shift_share_exposure(
         share_column: Column holding the employment share.
 
     Returns:
-        One row per region, with the exposure and the share of regional
-        employment for which a bite was measured. A region whose covered share
-        is low has an exposure resting on a minority of its workers, and the
-        column is returned so that can be judged rather than assumed away.
+        One row per region, with `regional_bite_exposure` and the share of
+        regional employment the bite was measured on. The name is deliberate:
+        this is an employment-weighted bite, not a cost share. It becomes cost
+        exposure only once multiplied by labour's share of costs, which is not
+        yet in the pipeline, and naming it that now would overstate what it
+        measures.
 
     Raises:
         ExposureError: If required columns are missing or nothing merges.
@@ -571,14 +762,22 @@ def shift_share_exposure(
         raise ExposureError("no activities merged; check the activity coding")
 
     measured = merged.dropna(subset=["minimum_wage_bite"]).copy()
-    measured["contribution"] = measured[share_column] * measured["minimum_wage_bite"]
+    if "measured_employment_share" not in measured.columns:
+        measured["measured_employment_share"] = 1.0
+
+    # Weight by the employment the bite was measured on, not by the whole group.
+    # A partly surveyed group contributes only its surveyed part; counting the
+    # rest would impute a bite to workers nobody looked at and would report the
+    # region as better covered than it is.
+    measured["covered"] = measured[share_column] * measured["measured_employment_share"]
+    measured["contribution"] = measured["covered"] * measured["minimum_wage_bite"]
 
     exposure = measured.groupby("region", as_index=False).agg(
-        cost_exposure=("contribution", "sum"),
-        covered_employment_share=(share_column, "sum"),
+        regional_bite_exposure=("contribution", "sum"),
+        covered_employment_share=("covered", "sum"),
     )
-    # Renormalise onto measured employment, so a region is not scored low merely
-    # because more of its workforce sits outside the survey's scope.
-    exposure["cost_exposure"] = exposure["cost_exposure"] / exposure["covered_employment_share"]
+    exposure["regional_bite_exposure"] = (
+        exposure["regional_bite_exposure"] / exposure["covered_employment_share"]
+    )
     exposure["exposure_definition"] = "shift_share_national_bite"
     return exposure.sort_values("region").reset_index(drop=True)

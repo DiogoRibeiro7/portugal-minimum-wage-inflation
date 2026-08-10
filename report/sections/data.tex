@@ -67,11 +67,29 @@ under its former domain now answers with an unrelated landing page. The
 publications are retrieved instead from the Internet Archive and are registered
 with their archival addresses and checksums, so the citation remains verifiable.
 
-The recovered monitoring reports give coverage by economic activity. They do not
-give a systematic breakdown by NUTS II region, which the identification strategy
-in Section~\ref{sec:methods} requires. Constructing a region-by-industry measure
-from these sources would require assuming that within-industry coverage does not
-vary across regions, so that all regional variation comes from industry mix.
-That assumption is not innocuous in a country whose regions differ sharply in
-tourism intensity, and it is not made here. The price pass-through estimates are
-therefore not reported in this version.
+The recovered monitoring reports give the bite by economic activity for the
+country as a whole. They do not give it by region. An earlier version of this
+work inferred from that alone that no source crossed a regional with an industry
+dimension, and set the exposure design aside as blocked. The inference was too
+broad, and the correction matters for what the paper can claim. Eurostat's
+regional accounts publish employment by NUTS~II region and NACE activity for
+Portugal (\texttt{nama\_10r\_3empers}), which supplies the composition term;
+the monitoring reports supply the industry term. The shift-share measure is
+therefore constructible, and Section~\ref{sec:robustness} constructs it.
+
+What is genuinely unobserved is regional variation in the bite itself. Holding
+within-industry coverage at its national value is the measure's maintained
+assumption, and it is substantive rather than technical: accommodation and food
+service carries by far the highest bite of any activity, and Portuguese regions
+differ in both how much of it they have and what it pays, so the assumption
+attenuates precisely the variation the design would exploit.
+
+Two limits of the source are recorded with the measure rather than argued away.
+The survey excludes agriculture and public administration, so between
+\ExposureCoverageMinPct{} and \ExposureCoverageMaxPct{}~per cent of a region's
+employment carries a measured bite; the remainder is left absent rather than set
+to zero, which would assert that no agricultural worker earns the minimum wage.
+And the published bite refers to \ExposureBitePeriod{}. Coverage observed after
+a statutory rise is partly caused by it, so the pipeline treats a bite dated at
+or after the first shock in an estimation window as inadmissible rather than
+merely imperfect, and refuses to build exposure for such a window at all.

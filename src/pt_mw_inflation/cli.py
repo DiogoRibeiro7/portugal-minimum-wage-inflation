@@ -12,6 +12,7 @@ import yaml
 from pt_mw_inflation.analysis.local_projections import estimate_panel_local_projections
 from pt_mw_inflation.analysis.outputs import (
     generate_macro_outputs,
+    write_exposure_macros,
     write_identification_macros,
     write_regional_design_table,
 )
@@ -20,9 +21,23 @@ from pt_mw_inflation.data.ameco import to_frame as ameco_to_frame
 from pt_mw_inflation.data.dgert import parse_minimum_wage_history
 from pt_mw_inflation.data.eurostat import fetch_minimum_wage as fetch_eurostat_minimum_wage
 from pt_mw_inflation.data.eurostat import fetch_portugal_hicp, save_frame
+from pt_mw_inflation.data.eurostat_regional import (
+    RegionalEmploymentError,
+    fetch_national_employment,
+    fetch_regional_employment,
+    industry_shares,
+    require_matched_inputs,
+)
 from pt_mw_inflation.data.ine import fetch_regional_cpi
 from pt_mw_inflation.data.registry import download_registry
 from pt_mw_inflation.data.worldbank import fetch_indicator
+from pt_mw_inflation.processing.exposure import (
+    PredeterminationError,
+    activity_bite_from_registry,
+    check_predetermined,
+    measure_variation_strength,
+    shift_share_exposure,
+)
 from pt_mw_inflation.processing.macro import (
     build_macro_annual,
     check_accounting_identities,
@@ -104,6 +119,112 @@ def data_ine_cpi(
         f"  {regions} NUTS II regions, {frame['category_code'].nunique()} consumption "
         f"categories, {frame['month'].min():%Y-%m} to {frame['month'].max():%Y-%m}"
     )
+
+
+@data_app.command("regional-employment")
+def data_regional_employment(
+    output: Path = typer.Option(
+        Path("data/processed/regional_employment.parquet"), help="Output Parquet path."
+    ),
+    national_output: Path = typer.Option(
+        Path("data/processed/national_employment.parquet"),
+        help="National employment by NACE section, used to weight the bite.",
+    ),
+    year: int = typer.Option(2015, help="Year the national weights are taken from."),
+) -> None:
+    """Download regional and national employment by industry from Eurostat."""
+    root = _repo_root()
+    regional = fetch_regional_employment()
+    national = fetch_national_employment(year=year)
+
+    for frame, path in ((regional, output), (national, national_output)):
+        destination = root / path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        frame.to_parquet(destination, index=False)
+
+    first, last = int(regional["year"].min()), int(regional["year"].max())
+    typer.echo(f"Wrote {len(regional):,} regional observations to {output}")
+    typer.echo(f"  {regional['region'].nunique()} regions, {first}-{last}")
+    typer.echo(f"Wrote {len(national):,} national activity rows for {year} to {national_output}")
+    typer.echo(
+        f"  counted over {national['population'].iat[0]}, the population the bite is measured on"
+    )
+
+
+@build_app.command("regional-exposure")
+def build_regional_exposure(
+    regional: Path = typer.Option(
+        Path("data/processed/regional_employment.parquet"),
+        help="Regional employment from 'ptmw data regional-employment'.",
+    ),
+    national: Path = typer.Option(
+        Path("data/processed/national_employment.parquet"),
+        help="National employment by NACE section.",
+    ),
+    baseline_year: int = typer.Option(2015, help="Year the composition is frozen at."),
+    first_shock_year: int = typer.Option(
+        0, help="First year of the episode. When set, predetermination is enforced."
+    ),
+    output: Path = typer.Option(
+        Path("data/processed/regional_exposure.parquet"), help="Output Parquet path."
+    ),
+) -> None:
+    """Build the shift-share regional exposure from composition and the national bite."""
+    root = _repo_root()
+    for path in (regional, national):
+        if not (root / path).exists():
+            raise typer.BadParameter(f"{path} not found; run 'ptmw data regional-employment' first")
+
+    registry = yaml.safe_load((root / "config/minimum_wage_bite.yaml").read_text(encoding="utf-8"))
+    if first_shock_year:
+        # Refuses a bite or composition dated at or after the first shock, since
+        # coverage measured after a rise is partly caused by it. Surfaced as a
+        # parameter error rather than a traceback: it is a statement about the
+        # window the caller asked for, not a fault in the code.
+        try:
+            check_predetermined(registry, baseline_year, first_shock_year)
+        except PredeterminationError as error:
+            raise typer.BadParameter(str(error)) from error
+
+    national_employment = pd.read_parquet(root / national)
+    regional_employment = pd.read_parquet(root / regional)
+
+    # Composition is frozen at baseline_year here; the weights were frozen at
+    # whatever year was passed to 'data regional-employment'. Nothing tied the
+    # two together, so changing one option produced a measure labelled as frozen
+    # at a year only half of it was frozen at. The download now stamps its year
+    # and this refuses the mismatch.
+    try:
+        population = require_matched_inputs(
+            regional_employment, national_employment, baseline_year=baseline_year
+        )
+    except RegionalEmploymentError as error:
+        raise typer.BadParameter(str(error)) from error
+
+    shares = industry_shares(regional_employment, year=baseline_year)
+    bite = activity_bite_from_registry(registry, national_employment)
+    exposure = shift_share_exposure(shares, bite)
+
+    destination = root / output
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    exposure.to_parquet(destination, index=False)
+
+    typer.echo(f"Wrote exposure for {len(exposure)} regions to {output}")
+    typer.echo(f"  composition and weights both count {population}, frozen at {baseline_year}")
+    covered = exposure["covered_employment_share"]
+    typer.echo(f"  bite measured on {covered.min():.0%}-{covered.max():.0%} of regional employment")
+
+    strength = measure_variation_strength(exposure)
+    macros = write_exposure_macros(
+        exposure, strength, registry, root / "report/tables/exposure_macros.tex"
+    )
+    typer.echo(f"  macros written to {macros.relative_to(root)}")
+    typer.echo(f"  {strength.detail}")
+    if strength.coefficient_of_variation < 0.05:
+        typer.echo(
+            "  This is flat. Distinct values establish identification in principle, "
+            "not that it is precise enough to be informative."
+        )
 
 
 @build_app.command("minimum-wage")

@@ -49,37 +49,102 @@ bite_by_activity:
   Atividades Artísticas, De Espetáculos, Desportivas e Recreativas: 19.7
   Outras Atividades de Serviços: 26.9
 
-# Eurostat regional accounts publish employment at coarser aggregates than the
-# survey reports the bite at, so each aggregate takes the mean of the sections
-# it contains. That is an unweighted mean: national employment by CAE section is
-# not among the series retrieved here, so the shares needed to weight it are not
-# available. The approximation matters most for B-E, where manufacturing
-# dominates employment but is averaged with a near-zero-bite utility sector.
+# Eurostat regional accounts publish employment at coarser groups than the
+# survey reports the bite at, so each group's bite is the employment-weighted
+# mean of its sections, using national employment by NACE section.
+#
+# The weights count *employees* (Eurostat `nama_10_a64_e`, `na_item=SAL_DC`),
+# not total employment. The bite is a share of full-time employees, so weighting
+# it by a population that also contains the self-employed would give a sector
+# influence proportional to a headcount the bite was never measured over.
+# Agriculture and construction carry far more self-employment than finance, so
+# the mismatch would not wash out across sectors.
+#
+# Two differences between the populations remain and are not corrected. The
+# survey covers full-time employees while the weights count employees at any
+# hours, and the survey's reference month is October while the weights are an
+# annual average. Both are approximations. Counting all workers instead of
+# employees on both sides moves the regional exposure spread by 0.11 percentage
+# points and no group's bite by more than 0.4, so neither approximation is
+# capable of changing the conclusion the measure supports, which is that its
+# spread is too small to identify anything.
+#
+# `sections` lists the NACE sections a group contains -- all of them, including
+# those the survey does not cover. That completeness is the point. Listing only
+# the measured sections would let a group's bite be assigned to employment the
+# survey never looked at: the O-Q group contains public administration, which
+# is outside the survey, and treating O-Q as though it were only education and
+# health imputes a minimum-wage bite to public administration and overstates
+# how much employment carries measured information.
+#
+# `measured` names the subset with a published bite. The builder weights the
+# bite over `measured` and reports the share of the group's employment those
+# sections represent, so a group that is only partly observed is visible as
+# such rather than silently renormalised.
+
 nace_aggregates:
-  A: []
+  A:
+    sections: [A]
+    measured: []
   B-E:
-    - Indústrias Extrativas
-    - Indústrias Transformadoras
-    - Eletricidade, Gás, Vapor, Água Quente e Fria e Ar
-    - Captação, Tratamento e Distribuição de Água
+    sections: [B, C, D, E]
+    measured:
+      - Indústrias Extrativas
+      - Indústrias Transformadoras
+      - Eletricidade, Gás, Vapor, Água Quente e Fria e Ar
+      - Captação, Tratamento e Distribuição de Água
   F:
-    - Construção
+    sections: [F]
+    measured: [Construção]
   G-I:
-    - Comércio por Grosso e Retalho
-    - Transportes e Armazenagem
-    - Alojamento e Restauração
+    sections: [G, H, I]
+    measured:
+      - Comércio por Grosso e Retalho
+      - Transportes e Armazenagem
+      - Alojamento e Restauração
   J:
-    - Atividades de Informação e Comunicação
+    sections: [J]
+    measured: [Atividades de Informação e Comunicação]
   K:
-    - Atividades Financeiras e de Seguros
+    sections: [K]
+    measured: [Atividades Financeiras e de Seguros]
   L:
-    - Atividades Imobiliárias
+    sections: [L]
+    measured: [Atividades Imobiliárias]
   M_N:
-    - Atividades de Consultadoria
-    - Atividades Administrativas e dos Serviços de Apoio
+    sections: [M, N]
+    measured:
+      - Atividades de Consultadoria
+      - Atividades Administrativas e dos Serviços de Apoio
   O-Q:
-    - Educação
-    - Atividades de Saúde Humana e de Apoio Social
+    sections: [O, P, Q]
+    measured:
+      - Educação
+      - Atividades de Saúde Humana e de Apoio Social
   R-U:
-    - Atividades Artísticas, De Espetáculos, Desportivas e Recreativas
-    - Outras Atividades de Serviços
+    sections: [R, S, T, U]
+    measured:
+      - Atividades Artísticas, De Espetáculos, Desportivas e Recreativas
+      - Outras Atividades de Serviços
+
+# The NACE section each measured activity corresponds to, so the bite can be
+# weighted by that section's employment. Mapped by name because the published
+# table's letters and names are misaligned in its text layer.
+section_of_activity:
+  Indústrias Extrativas: B
+  Indústrias Transformadoras: C
+  Eletricidade, Gás, Vapor, Água Quente e Fria e Ar: D
+  Captação, Tratamento e Distribuição de Água: E
+  Construção: F
+  Comércio por Grosso e Retalho: G
+  Transportes e Armazenagem: H
+  Alojamento e Restauração: I
+  Atividades de Informação e Comunicação: J
+  Atividades Financeiras e de Seguros: K
+  Atividades Imobiliárias: L
+  Atividades de Consultadoria: M
+  Atividades Administrativas e dos Serviços de Apoio: N
+  Educação: P
+  Atividades de Saúde Humana e de Apoio Social: Q
+  Atividades Artísticas, De Espetáculos, Desportivas e Recreativas: R
+  Outras Atividades de Serviços: S

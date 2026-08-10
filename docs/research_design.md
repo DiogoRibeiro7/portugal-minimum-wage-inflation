@@ -14,6 +14,46 @@ attainable with the variation Portugal supplies, and the reasons are recorded
 below rather than treated as unfinished work. Stating them is more useful to a
 reader than a weakly identified estimate.
 
+### Read this before the rest
+
+> **Every number below is a snapshot, not a source.** The manuscript takes its
+> figures from generated macros; this document restates them by hand so the
+> argument can be read on its own. Where the two disagree, the macros are right.
+> Regenerate them with `ptmw build regional-exposure` and `ptmw analyse
+> pass-through`, and read `report/tables/exposure_macros.tex` and
+> `report/tables/identification_macros.tex` for the current values.
+>
+> The per-group figures below --- each group's bite, and how much of its
+> employment the survey covered --- have no macro behind them, because the paper
+> does not quote them. Reproduce those from
+> `activity_bite_from_registry(registry, national_employment)` rather than
+> looking for a generated file that does not exist.
+
+The document is layered: it records positions in the order they were reached,
+including one that was later shown to be wrong, because how it was reached is
+worth keeping. The current position is this, and it supersedes anything below
+that conflicts with it.
+
+- The exposure design is **not** blocked by missing data. Regional industry
+  composition is published by Eurostat and the national minimum-wage bite by
+  activity is recoverable from the labour ministry, so the shift-share measure
+  is constructible and is constructed. The section *The region-by-industry
+  exposure measure, revisited* corrects the earlier claim to the contrary, and
+  the earlier claim is left in place, marked, rather than edited out.
+- The exposure design **is** blocked by two other things. The measure spans 1.94
+  percentage points across nine regions with a coefficient of variation of
+  0.027, which identifies a regional effect in principle and nothing in
+  practice; and the published bite post-dates the 2015 policy restart, so it is
+  not predetermined for the episode with the most policy variation.
+- Regional *policy* variation exists but is thin: three identifying
+  region-months in one region, which conventional inference calls significant at
+  six horizons and the bootstrap at none.
+
+The net objective is unchanged, but the reason for it is different from the one
+stated when it was written. The causal layer fails because the variation is too
+small, not because the data does not exist. Those are different claims, and the
+paper now makes the second.
+
 ## Contribution architecture
 
 ### Contribution 1: the statutory series, from primary law
@@ -47,12 +87,18 @@ not causal and is not presented as such.
 ### Contribution 3: a documented negative identification result
 
 An account of why regional variation cannot identify pass-through in Portugal,
-specific enough to be checked:
+specific enough to be checked. The claim is about the size of the variation, not
+the availability of data, and every part of it is measured rather than asserted:
 
 - the Azorean supplement is proportional, so in logs the Azorean statutory
   change equals the mainland's in every month after it took effect, and the
   region contributes no independent timing;
 - Madeira is the only source of genuine divergence;
+- the shift-share exposure measure that would substitute for policy variation is
+  built and reported, and spans 1.94 percentage points across nine regions,
+  which is too flat to identify a price response; the constraint is that the
+  Portuguese wage floor binds at broadly similar rates across industries, so
+  industry mix carries little information about exposure to it;
 - with the small number of Portuguese regions, conventional cluster-robust
   inference rejects a true null far above its nominal size, and the estimates it
   calls highly significant survive none of a wild cluster bootstrap;
@@ -80,9 +126,11 @@ prices.
 
 The original standard required pre-trend diagnostics, small-cluster inference,
 predetermined exposure and robustness to alternative exposure definitions before
-any causal conclusion. That standard is retained and is not met, which is why no
-causal conclusion is drawn. The revised standard for what the paper does claim
-is narrower and is met:
+any causal conclusion. That standard is retained and is not met — small-cluster
+inference is implemented and rejects nothing, and predetermination is enforced
+and refuses the one episode worth estimating — which is why no causal conclusion
+is drawn. The revised standard for what the paper does claim is narrower and is
+met:
 
 1. every statutory value is traceable to the act that set it;
 2. every price and productivity series is retrieved reproducibly and checksummed;
@@ -209,20 +257,46 @@ So the design is constrained by an assumption, not blocked by missing data.
 Those are different positions and the earlier document asserted the wrong one.
 
 **What the measure delivers.** Frozen on 2015 composition, exposure ranges from
-18.4 per cent in Norte to 20.5 per cent in the Algarve, with every one of the
-nine regions taking a distinct value. The regional composition behind it varies
-sharply: the Algarve has 38.8 per cent of employment in trade, transport,
-accommodation and food service against the Alentejo's 20.5, while the Alentejo
-has 22.0 per cent in agriculture against Grande Lisboa's 0.7.
+19.7 per cent in Grande Lisboa to 21.7 per cent in the Norte, with every one of
+the nine regions taking a distinct value. The composition behind it varies
+sharply: the Algarve has 41.8 per cent of employees in trade, transport,
+accommodation and food service against the Alentejo's 21.6, while the Alentejo
+has 13.4 per cent in agriculture against Grande Lisboa's 0.5.
 
-**Two limits to state when using it.** The published bite excludes agriculture
-and public administration, so between 78 and 99 per cent of a region's
-employment carries a measured bite; the covered share is returned alongside the
-exposure rather than renormalised away silently. And the regional accounts
-publish employment at coarser activity groups than the survey reports the bite
-at, so each group takes an unweighted mean of its sections. That compresses the
-spread, most visibly for industry, where manufacturing's high bite is averaged
-with a near-zero-bite utility sector.
+**The aggregation must be employment-weighted, and it was not.** The regional
+accounts publish coarser activity groups than the survey measures the bite at,
+so each group's bite is the mean of its sections. Taking that mean unweighted
+puts manufacturing and a near-zero-bite utility sector on equal footing: it
+gives industry a bite of 13.7 per cent where the employment-weighted figure is
+23.5. That is not a rounding difference. It reversed the regional ordering, with
+the unweighted version placing the tourism-heavy Algarve top and the
+manufacturing-heavy Norte bottom, which the weighted version exactly inverts.
+National employment by NACE section supplies the weights, counting employees
+rather than total employment, since the bite is a share of employees and
+agriculture and construction carry far more self-employment than finance.
+
+**Coverage must be measured, not assumed.** The survey excludes agriculture and
+public administration. Agriculture is its own group and is straightforwardly
+absent, but public administration shares a group with education and health, so
+assigning the surveyed sections' bite to the whole group imputes a minimum wage
+to workers nobody surveyed and reports the group as fully covered. Measuring it
+properly, that group is 68.6 per cent covered and arts-and-other-services 47.8
+per cent, which takes regional coverage down to a 73.4 to 89.4 per cent range
+from the 78 to 99 previously reported.
+
+**Predetermination is enforced, not assumed.** The published bite is dated
+October 2017. Applying it to the 2015 policy restart would make exposure
+post-treatment, since coverage after a rise is partly caused by it, and nothing
+in the data prevents that. `check_predetermined` refuses a bite or composition
+dated at or after the first shock. It currently refuses the 2015 episode, which
+is correct: estimating that episode needs an earlier GEP snapshot, not a
+different argument.
+
+**Whether the variation is strong enough is a separate question.** The spread is
+1.94 percentage points and the coefficient of variation 0.027. Nine distinct
+values establish that a regional effect is identified in principle;
+they do not establish that it is identified precisely enough to be informative,
+and `require_regional_variation` answers only the first question.
 
 `require_regional_variation` accepts this measure, having rejected the
 marginals-derived construction it replaces. The guard was right about the old
