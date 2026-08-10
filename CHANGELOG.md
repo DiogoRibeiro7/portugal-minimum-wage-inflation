@@ -79,6 +79,20 @@ was.
 - A documented feasibility assessment of the region-by-industry exposure
   measure, recording that no Portuguese source crosses a regional with an
   industry dimension, and what would unblock it.
+- Retrieval of Portuguese legal acts from the Diário da República by ELI
+  permalink, with parsing of the amounts and percentages they state. The
+  gazette's web interface returns no content to a plain request; the permalink
+  redirects to the published PDF, which is stable, official and citable.
+- Regional statutory minimum wages for Madeira and the Azores, built from the
+  acts themselves, together with the premium over the national wage.
+- `config/legal_acts.yaml`, the register of acts retrieved as primary sources.
+
+### Changed
+
+- The 2000 statutory values are read from Decreto-Lei n.º 573/99 rather than
+  taken from Eurostat. With that act and its domestic-service value included,
+  every stated increase in the published history reconciles with the act
+  preceding it, and no year is sourced to a secondary compiler.
 
 ### Changed
 
