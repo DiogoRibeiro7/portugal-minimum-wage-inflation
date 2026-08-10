@@ -19,16 +19,18 @@ history to a few dozen calls rather than one per month.
 
 from __future__ import annotations
 
+import json
 import time
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import requests
 
-from pt_mw_inflation.data.http import USER_AGENT
+from pt_mw_inflation.data.http import USER_AGENT, sha256_bytes
 
 INE_API = "https://www.ine.pt/ine/json_indicador/pindica.jsp"
-INE_META_API = "https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp"
 
 #: Consumer price index, base 2025, by NUTS II (2024) and consumption purpose,
 #: monthly from January 1991.
@@ -202,6 +204,7 @@ def fetch_regional_cpi(
     indicator: str = REGIONAL_CPI_INDICATOR,
     batch_months: int = 12,
     pause_seconds: float = 1.5,
+    raw_dir: Path | None = None,
 ) -> pd.DataFrame:
     """Fetch the regional consumer price panel.
 
@@ -214,27 +217,43 @@ def fetch_regional_cpi(
             refusing connections when a long history is pulled without pacing,
             so this is what makes a full run complete rather than an increase
             in retries.
+        raw_dir: Directory to retain the raw responses in, with a checksum
+            manifest. The processed panel is derived, and the indicator it comes
+            from is retired without redirect when the series is rebased, so
+            without the raw payloads the panel cannot be reproduced.
 
     Returns:
         Tidy observations with `month`, `nuts_code`, `region`, `category_code`,
         `category`, `price_index` and `is_aggregate`.
 
     Raises:
-        IneError: If the API fails or returns no observations.
+        IneError: If the API fails, returns no observations, or is asked for a
+            non-positive batch size.
     """
+    if batch_months < 1:
+        raise IneError(f"batch_months must be positive, got {batch_months}")
     if end is None:
         previous = pd.Timestamp.today().to_period("M") - 1
         end = f"{previous.year}-{previous.month:02d}"
 
     periods = monthly_periods(start, end)
     records: list[dict[str, Any]] = []
+    provenance: list[dict[str, Any]] = []
 
     for index in range(0, len(periods), batch_months):
         if index and pause_seconds:
             time.sleep(pause_seconds)
         batch = periods[index : index + batch_months]
-        node = _request({"op": "2", "varcd": indicator, "Dim1": ",".join(batch), "lang": "PT"})
+        params = {"op": "2", "varcd": indicator, "Dim1": ",".join(batch), "lang": "PT"}
+        node = _request(params)
         records.extend(parse_observations(node))
+
+        if raw_dir is not None:
+            provenance.append(_retain(node, params, raw_dir, batch))
+
+    if raw_dir is not None and provenance:
+        manifest = raw_dir / "regional_cpi_manifest.json"
+        manifest.write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
 
     if not records:
         raise IneError(f"indicator {indicator} returned no observations for {start}..{end}")
@@ -244,3 +263,29 @@ def fetch_regional_cpi(
     frame["is_aggregate"] = frame["nuts_code"].isin(AGGREGATE_GEOGRAPHIES)
 
     return frame.sort_values(["nuts_code", "category_code", "month"]).reset_index(drop=True)
+
+
+def _retain(
+    node: dict[str, Any], params: dict[str, str], raw_dir: Path, batch: list[str]
+) -> dict[str, Any]:
+    """Write one raw response to disk and return its provenance record.
+
+    The panel is a derived artefact and the indicator behind it is retired
+    without redirect when the series is rebased, so the responses are kept with
+    their checksums. Without them the processed file could not be reproduced,
+    only re-downloaded from a source that may no longer exist.
+    """
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(node, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    name = f"regional_cpi_{batch[0]}_{batch[-1]}.json"
+    (raw_dir / name).write_bytes(payload)
+
+    return {
+        "file": name,
+        "indicator": params["varcd"],
+        "periods": batch,
+        "url": f"{INE_API}?" + "&".join(f"{k}={v}" for k, v in params.items()),
+        "retrieved_at_utc": datetime.now(UTC).isoformat(),
+        "sha256": sha256_bytes(payload),
+        "bytes": len(payload),
+    }

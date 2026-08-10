@@ -128,6 +128,46 @@ def test_reversed_range_is_rejected() -> None:
         monthly_periods("2026-06", "2020-01")
 
 
-def test_missing_data_block_is_reported() -> None:
-    """A retired indicator answers 200 with an error body, not a failure code."""
-    assert parse_observations({"IndicadorCod": "0007320"}) == []
+def test_retired_indicator_raises_rather_than_returning_nothing() -> None:
+    """A retired indicator answers 200 with an error body, not a failure code.
+
+    INE retires codes without redirect when a series is rebased, and reports it
+    in the body under a success status. Treating that as an empty result would
+    write an empty panel and call it a successful build, so the request layer
+    has to raise. This exercises that path rather than the defensive return in
+    the parser, which the request layer means is never reached in practice.
+    """
+    import pt_mw_inflation.data.ine as ine_module
+
+    class _Retired:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> list[dict[str, object]]:
+            return [
+                {
+                    "IndicadorCod": "0007320",
+                    "Sucesso": {"Falso": [{"Msg": "O codigo do indicador nao existe."}]},
+                }
+            ]
+
+    def fake_get(*_: object, **__: object) -> _Retired:
+        return _Retired()
+
+    original = ine_module.requests.get
+    ine_module.requests.get = fake_get  # type: ignore[assignment]
+    try:
+        with pytest.raises(IneError, match="no data returned"):
+            ine_module._request({"varcd": "0007320"})
+    finally:
+        ine_module.requests.get = original  # type: ignore[assignment]
+
+
+def test_non_positive_batch_size_is_rejected() -> None:
+    """An invalid batch size must be named, not surface as an unrelated error."""
+    from pt_mw_inflation.data.ine import fetch_regional_cpi
+
+    with pytest.raises(IneError, match="batch_months must be positive"):
+        fetch_regional_cpi(start="2020-01", end="2020-03", batch_months=0)

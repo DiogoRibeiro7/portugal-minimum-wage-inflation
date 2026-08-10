@@ -198,7 +198,8 @@ Built by `ptmw data ine-cpi` from Statistics Portugal indicator `0014659`.
 | Column | Meaning |
 | ------ | ------- |
 | `month` | First day of the reference month. |
-| `nuts_code` | NUTS II code, e.g. `PT11`, `PT20`. |
+| `ine_geocode` | Geographic code exactly as published by INE. Retained so a row can be traced back to the raw response. |
+| `nuts_code` | NUTS II code derived from `ine_geocode`, e.g. `PT11`, `PT20`. |
 | `region` | Region name as published. |
 | `category_code` | Consumption purpose code; `T` is the all-items total. |
 | `category` | Consumption purpose name. |
@@ -225,6 +226,16 @@ catalogue at dados.gov.pt, which lists each indicator with its API URL.
 The API is rate limited and refuses connections rather than returning 429, so
 requests are paced and retried. Pacing, not retry count, is what lets a full
 history complete.
+
+### Raw retention
+
+Each paged response is written verbatim to `data/raw/ine/` with a checksum
+manifest at `data/raw/ine/regional_cpi_manifest.json`, recording the file, the
+indicator, the periods requested, the request URL, the retrieval timestamp, the
+SHA-256 and the byte count. The processed panel is a derived artefact, and the
+indicator behind it is retired without redirect when the series is rebased, so
+without the raw payloads the panel could not be reproduced — only re-downloaded
+from a source that may no longer exist.
 
 ## Exposure panel
 
