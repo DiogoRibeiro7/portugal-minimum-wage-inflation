@@ -86,6 +86,11 @@ was.
 - Regional statutory minimum wages for Madeira and the Azores, built from the
   acts themselves, together with the premium over the national wage.
 - `config/legal_acts.yaml`, the register of acts retrieved as primary sources.
+- Manuscript restructured around the long-run record. The paper now documents
+  the statutory series built from primary law, the real erosion of the wage
+  floor against productivity, and a negative identification result explaining
+  why regional variation cannot identify pass-through in Portugal. No causal
+  claim is made.
 - Regional consumer price panel from Statistics Portugal indicator `0014659`:
   price indices by NUTS II region and consumption purpose, monthly, built for
   2000 onwards by `ptmw data ine-cpi`. This is the last data dependency of the

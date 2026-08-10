@@ -240,5 +240,5 @@ def test_outputs_are_written(tmp_path: Path) -> None:
         assert path.exists() and path.stat().st_size > 0
 
     macros = (tmp_path / "tables" / "headline_macros.tex").read_text(encoding="utf-8")
-    assert r"\newcommand{\MacroFirstYear}{1974}" in macros
+    assert r"\providecommand{\MacroFirstYear}{1974}" in macros
     assert "Do not edit" in macros

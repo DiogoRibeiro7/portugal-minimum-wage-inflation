@@ -19,12 +19,17 @@ SECTIONS = REPORT / "sections"
 #: Commands defined by LaTeX, the preamble, or the generated tables, which the
 #: sections may use without the macro file defining them.
 _STRUCTURAL = re.compile(
-    r"^(section|subsection|subsubsection|label|ref|eqref|cite|citep|citet|input|includegraphics"
-    r"|begin|end|centering|caption|texttt|emph|textbf|textit|item|qquad|quad|text|pi|,|\\)$"
+    r"^(section|subsection|subsubsection|paragraph|label|ref|eqref|cite|citep|citet|input"
+    r"|includegraphics|begin|end|centering|caption|texttt|emph|textbf|textit|item|qquad|quad"
+    r"|text|pi|toprule|midrule|bottomrule"
+    # Greek letters are capitalised commands too, and are not generated
+    # quantities; without them every equation reads as an undefined citation.
+    r"|Delta|Gamma|Lambda|Omega|Sigma|Phi|Psi|Theta|Xi"
+    r"|,|\\)$"
 )
 
 _MACRO_USE = re.compile(r"\\([A-Za-z]+)\{?\}?")
-_MACRO_DEF = re.compile(r"\\newcommand\{\\([A-Za-z]+)\}")
+_MACRO_DEF = re.compile(r"\\(?:new|provide)command\{\\([A-Za-z]+)\}")
 
 
 def _generated_macros() -> set[str]:
