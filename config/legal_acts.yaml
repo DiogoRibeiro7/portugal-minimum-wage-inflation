@@ -1,0 +1,55 @@
+# Legal acts retrieved directly from the Diário da República by ELI permalink.
+#
+# These are primary sources. Each value below is read from the act that set it,
+# not from a provider's summary table, and each act is addressable at a stable
+# official URL. Adding an act here is how the wage history is extended.
+
+# Acts that the DGERT summary table omits. The parsed national history is
+# otherwise authoritative; these fill documented holes in it.
+national_supplements:
+  - act_type: dec-lei
+    number: 573
+    act_date: 1999-12-30
+    effective_date: 2000-01-01
+    scope: general
+    amount_index: 0
+    reason: >-
+      The DGERT history does not list the act effective in 2000, while its 2001
+      entries state their increase relative to it. Article 1 of this decree sets
+      the value at 63 800$ and article 3 gives effect from 1 January 2000.
+  - act_type: dec-lei
+    number: 573
+    act_date: 1999-12-30
+    effective_date: 2000-01-01
+    scope: domestic_service
+    amount_index: 1
+    reason: >-
+      The same article sets a second value, 60 000$, for the domestic-service
+      regime, which the summary history omits for the same year.
+
+# Regional statutory minimum wages. Both autonomous regions may set a wage above
+# the national one, and the two do it differently: Madeira legislates a value
+# each year, the Azores legislate a permanent proportional supplement.
+regional:
+  madeira:
+    geography: PT30
+    name: Região Autónoma da Madeira
+    mechanism: explicit_value
+    acts:
+      - {act_type: declegreg, number: 11, act_date: 2023-02-14, effective_date: 2023-01-01}
+      - {act_type: declegreg, number: 3, act_date: 2024-02-08, effective_date: 2024-01-01}
+      - {act_type: declegreg, number: 20, act_date: 2024-12-23, effective_date: 2025-01-01}
+      - {act_type: declegreg, number: 1, act_date: 2026-02-03, effective_date: 2026-01-01}
+
+  azores:
+    geography: PT20
+    name: Região Autónoma dos Açores
+    mechanism: proportional_supplement
+    # Article 3 fixes the supplement over the national wage. The regional series
+    # is derived from the national one by this rule rather than parsed from
+    # annual values, because the Azores do not legislate a figure.
+    supplement_act:
+      act_type: declegreg
+      number: 8
+      act_date: 2002-04-10
+      effective_date: 2002-01-01

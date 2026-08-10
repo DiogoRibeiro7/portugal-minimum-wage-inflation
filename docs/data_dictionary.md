@@ -71,14 +71,35 @@ quoted as the Portuguese minimum wage. **Downstream analysis uses `general`.**
 The special regimes were always set at or below the general wage, which the
 test suite asserts on every date where regimes coexist.
 
-### Known gap in the upstream history
+### The 2000 gap, closed from the primary source
 
-The DGERT page does not list the act that took effect in 2000, but the 2001
-entries still state their increase relative to that missing regime. Affected
-rows carry an explanatory `notes` value, and `find_unexplained_jumps` reports
-them. Eurostat's independent series implies a 2000 general wage of about
-318 EUR per month (63,800\$), which is consistent with the missing act, but no
-value is imputed: an unsourced number will not be written into the panel.
+The DGERT summary page does not list the act that took effect in 2000, while
+its 2001 entries state their increase relative to it. The act itself is now
+retrieved from the Diário da República and read directly:
+Decreto-Lei n.º 573/99 of 30 December 1999, article 1, sets the values at
+63 800\$ (general) and 60 000\$ (domestic service), with effect from 1 January
+2000 under article 3. Both are registered in `config/legal_acts.yaml` and merge
+into the parsed history.
+
+With them included, `find_unexplained_jumps` returns empty: every stated
+increase in the published history now reconciles with the act preceding it.
+
+### Regional statutory wages
+
+| Geography | Region | Mechanism |
+| --------- | ------ | --------- |
+| `PT20` | Azores | Proportional supplement of 5% over the national wage, fixed by article 3 of Decreto Legislativo Regional n.º 8/2002/A. |
+| `PT30` | Madeira | An explicit value legislated by regional decree, most years. |
+
+The distinction matters for identification. Madeira's premium over the mainland
+is not a rule and has widened — 3.3% in 2023, 3.7% in 2024, 5.2% in 2025, 6.5%
+in 2026 — so it is genuine independent policy variation. The Azores supplement
+is a fixed transformation of the national wage, so it contributes a level
+difference and the interaction of that difference with national changes, but no
+independent timing of its own.
+
+Regional rows carry `national_or_regional = "regional"` and record the
+mechanism and the source URL in `notes`.
 
 ### Cross-validation
 

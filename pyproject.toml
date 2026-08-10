@@ -39,6 +39,8 @@ dependencies = [
     "linearmodels>=6.1,<7.0",
     "scipy>=1.15,<2.0",
     "matplotlib>=3.10,<4.0",
+    "pypdf (>=6.0,<7.0)",
+    "cryptography (>=45.0,<46.0)",
 ]
 
 [project.urls]

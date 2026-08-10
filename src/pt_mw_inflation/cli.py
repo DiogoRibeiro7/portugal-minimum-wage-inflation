@@ -30,6 +30,10 @@ from pt_mw_inflation.processing.minimum_wage import (
     find_unexplained_jumps,
     reconcile_annual_with_eurostat,
 )
+from pt_mw_inflation.processing.regional import (
+    build_regional_panel,
+    supplementary_statutory_changes,
+)
 
 app = typer.Typer(help="Portugal minimum-wage inflation research pipeline.")
 data_app = typer.Typer(help="Download raw public data.")
@@ -84,8 +88,13 @@ def build_minimum_wage(
     if not raw.exists():
         raise typer.BadParameter(f"{source} not found; run 'ptmw data download-sources' first")
 
+    registry = yaml.safe_load((root / "config/legal_acts.yaml").read_text(encoding="utf-8"))
     changes = parse_minimum_wage_history(raw.read_bytes().decode("utf-8"))
+    changes += supplementary_statutory_changes(registry.get("national_supplements", []))
     panel = build_statutory_panel(changes)
+
+    regional = build_regional_panel(registry["regional"], panel[panel["scope"] == "general"])
+    panel = pd.concat([panel, regional], ignore_index=True)
 
     destination = root / output
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -95,12 +104,17 @@ def build_minimum_wage(
     for scope, count in panel["scope"].value_counts().sort_index().items():
         typer.echo(f"  {scope}: {count} acts")
 
+    for geography, count in regional["geography"].value_counts().sort_index().items():
+        typer.echo(f"  {geography}: {count} regional acts")
+
     unexplained = find_unexplained_jumps(changes)
     for scope, effective in unexplained:
         typer.echo(
             f"  incomplete upstream history: {scope} {effective} states an increase "
             "that does not reconcile with the previous listed act"
         )
+    if not unexplained:
+        typer.echo("  every stated increase reconciles with the preceding act")
 
 
 def _load_settings(root: Path) -> dict[str, Any]:

@@ -200,3 +200,34 @@ published by NUTS II region and economic activity jointly; Quadros de Pessoal
 microdata, from which the cross-tabulation can be built directly; or the Madeira
 and Azores statutory schedules, which would restore genuine regional variation
 in the policy change itself and make a national bite far less damaging.
+
+
+## Regional policy variation, recovered
+
+The feasibility assessment above concluded that the exposure design was blocked
+because no source crossed a region with an industry. That remains true of the
+*bite*. It is no longer true of the *policy*.
+
+Both autonomous regions legislate their own statutory minimum wage, and the
+acts are retrievable from the Diário da República at stable permalinks. The
+regional schedules are now built from those acts:
+
+- Madeira legislates an explicit value. Its premium over the mainland varies —
+  3.3 per cent in 2023 rising to 6.5 per cent in 2026 — and moves for reasons of
+  regional politics that are not a function of the national figure.
+- The Azores legislate a permanent 5 per cent supplement rather than an annual
+  value.
+
+This changes what the design can do. With regional variation in the policy
+itself, the exposure term $\Delta \log MW_{rt}$ is no longer constant across
+regions, so a national industry bite is far less damaging: identification can
+come from regions facing genuinely different statutory changes at the same
+moment, rather than only from cross-industry differences in a common shock.
+
+Two things are still required before pass-through can be estimated. Regional
+consumer prices by NUTS II and consumption purpose, which the price panel needs
+and which is not yet acquired; and an honest treatment of the fact that the two
+autonomous regions are small, remote and tourism-intensive, so they are not a
+clean control for the mainland. With two treated regions, few-cluster inference
+is not a refinement but the whole problem, and the procedures in
+`analysis/inference.py` are the minimum standard rather than a robustness check.
