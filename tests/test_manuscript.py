@@ -148,9 +148,16 @@ def test_no_section_claims_the_exposure_measure_cannot_be_built() -> None:
     offending: dict[str, list[str]] = {}
     for name, text in _section_text().items():
         flattened = " ".join(text.split())
-        found = [claim for claim in _UNAVAILABILITY_CLAIMS if claim in flattened]
-        if found:
-            offending[name] = found
+        # Scoped to the sentence, not the section. Several of these phrasings
+        # are ordinary English -- "is not made here" could one day describe an
+        # unrelated choice -- and a section-wide match would fail on prose that
+        # is perfectly honest about something else.
+        for sentence in re.split(r"(?<=\.)\s+", flattened):
+            if not re.search(r"exposure|coverage|bite|region|pass-through", sentence, re.I):
+                continue
+            found = [claim for claim in _UNAVAILABILITY_CLAIMS if claim in sentence]
+            if found:
+                offending.setdefault(name, []).extend(found)
 
     assert not offending, (
         "sections assert the exposure measure is unbuildable while the pipeline "

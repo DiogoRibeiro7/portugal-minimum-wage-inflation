@@ -292,3 +292,27 @@ def test_variation_strength_refuses_an_undefined_coefficient() -> None:
     centred = pd.DataFrame({"region": ["A", "B"], "regional_bite_exposure": [-0.2, 0.2]})
     with pytest.raises(ExposureError, match="coefficient of variation is undefined"):
         measure_variation_strength(centred)
+
+
+def test_incomplete_national_employment_is_refused_not_defaulted() -> None:
+    """A section absent from the weights must fail, not fall back to a default.
+
+    A missing section previously took a weight of one, which is not zero, not
+    its true size, and small enough in thousands of workers to look like a
+    rounding artefact. Every group containing it would carry a quietly wrong
+    bite and a quietly wrong coverage figure, and nothing downstream could
+    detect either.
+    """
+    truncated = NATIONAL_EMPLOYMENT.loc[NATIONAL_EMPLOYMENT["activity"] != "D"]
+    with pytest.raises(ExposureError, match=r"missing sections \['D'\]"):
+        activity_bite_from_registry(REGISTRY, truncated)
+
+
+def test_omitting_employment_entirely_still_weights_sections_equally() -> None:
+    """The unweighted mode remains available and is not caught by the guard.
+
+    It is correct for a group holding a single section, and the tests for
+    partial coverage depend on being able to reach it.
+    """
+    unweighted = activity_bite_from_registry(REGISTRY).set_index("industry")
+    assert unweighted.loc["B-E", "minimum_wage_bite"] == pytest.approx((0.006 + 0.24) / 2)

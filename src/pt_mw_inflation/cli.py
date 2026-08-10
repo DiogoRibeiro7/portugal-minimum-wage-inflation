@@ -144,6 +144,9 @@ def data_regional_employment(
     typer.echo(f"Wrote {len(regional):,} regional observations to {output}")
     typer.echo(f"  {regional['region'].nunique()} regions, {first}-{last}")
     typer.echo(f"Wrote {len(national):,} national activity rows for {year} to {national_output}")
+    typer.echo(
+        f"  counted over {national['population'].iat[0]}, the population the bite is measured on"
+    )
 
 
 @build_app.command("regional-exposure")
@@ -181,8 +184,27 @@ def build_regional_exposure(
         except PredeterminationError as error:
             raise typer.BadParameter(str(error)) from error
 
+    national_employment = pd.read_parquet(root / national)
+    # Composition is frozen at baseline_year here; the weights were frozen at
+    # whatever year was passed to 'data regional-employment'. Nothing tied the
+    # two together, so changing one option produced a measure labelled as frozen
+    # at a year only half of it was frozen at. The download now stamps its year
+    # and this refuses the mismatch.
+    if "reference_year" in national_employment.columns:
+        weight_years = sorted({int(year) for year in national_employment["reference_year"]})
+        if weight_years != [baseline_year]:
+            raise typer.BadParameter(
+                f"national weights are for {weight_years} but composition is frozen at "
+                f"{baseline_year}; re-run 'ptmw data regional-employment --year {baseline_year}'"
+            )
+    else:
+        typer.echo(
+            "  warning: national employment carries no reference year; "
+            "re-run 'ptmw data regional-employment' to stamp it"
+        )
+
     shares = industry_shares(pd.read_parquet(root / regional), year=baseline_year)
-    bite = activity_bite_from_registry(registry, pd.read_parquet(root / national))
+    bite = activity_bite_from_registry(registry, national_employment)
     exposure = shift_share_exposure(shares, bite)
 
     destination = root / output

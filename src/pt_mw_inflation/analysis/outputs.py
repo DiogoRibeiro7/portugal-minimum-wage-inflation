@@ -466,10 +466,15 @@ def write_exposure_macros(
     except ValueError as error:  # pragma: no cover - configuration error
         raise ValueError(f"unparseable bite reference period {reference!r}") from error
 
+    # The endpoints and the spread must be readable against each other. At one
+    # decimal the endpoints imply a range that disagrees with a two-decimal
+    # spread, so a reader checking the arithmetic finds a discrepancy that is
+    # not in the data.
     values = {
         "ExposureRegions": f"{strength.regions}",
-        "ExposureMinPct": f"{100 * float(values_series.min()):.1f}",
-        "ExposureMaxPct": f"{100 * float(values_series.max()):.1f}",
+        "ExposureDistinctValues": f"{int(values_series.round(6).nunique())}",
+        "ExposureMinPct": f"{100 * float(values_series.min()):.2f}",
+        "ExposureMaxPct": f"{100 * float(values_series.max()):.2f}",
         "ExposureSpreadPP": f"{100 * strength.spread:.2f}",
         "ExposureCV": f"{strength.coefficient_of_variation:.3f}",
         "ExposureCoverageMinPct": f"{100 * float(coverage.min()):.0f}",

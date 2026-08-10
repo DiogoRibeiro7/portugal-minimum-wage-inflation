@@ -40,10 +40,11 @@ def test_exposure_macros_carry_the_values_the_prose_cites(tmp_path: Path) -> Non
     written = _macros(write_exposure_macros(EXPOSURE, strength, REGISTRY, tmp_path / "e.tex"))
 
     assert written["ExposureRegions"] == "3"
-    assert written["ExposureMinPct"] == "20.0"
-    assert written["ExposureMaxPct"] == "21.8"
+    assert written["ExposureMinPct"] == "20.00"
+    assert written["ExposureMaxPct"] == "21.83"
     # Reported in percentage points, not in the frame's units.
     assert written["ExposureSpreadPP"] == "1.83"
+    assert written["ExposureDistinctValues"] == "3"
     assert written["ExposureCoverageMinPct"] == "81"
     assert written["ExposureCoverageMaxPct"] == "89"
 

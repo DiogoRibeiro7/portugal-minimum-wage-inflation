@@ -194,11 +194,26 @@ def industry_shares(
 NATIONAL_EMPLOYMENT_DATASET = "nama_10_a64_e"
 
 
+#: Employees, rather than total employment. The bite these weights aggregate is
+#: a share of *employees* paid the minimum wage, so weighting it by a population
+#: that also contains the self-employed would give a sector's bite an influence
+#: proportional to a headcount the bite was never measured over. Agriculture and
+#: construction carry far more self-employment than finance, so the mismatch is
+#: not a wash across sectors.
+EMPLOYEES = "SAL_DC"
+
+#: Total domestic employment, employees and self-employed together. Retained
+#: because the coverage denominators the exposure builder reports are about all
+#: the workers in a region, not only the employed ones.
+TOTAL_EMPLOYMENT = "EMP_DC"
+
+
 def fetch_national_employment(
     *,
     year: int,
     country: str = "PT",
     dataset: str = NATIONAL_EMPLOYMENT_DATASET,
+    na_item: str = EMPLOYEES,
     timeout_seconds: int = 180,
 ) -> pd.DataFrame:
     """Fetch national employment by NACE activity for one year.
@@ -207,10 +222,15 @@ def fetch_national_employment(
         year: Reference year.
         country: Geography code.
         dataset: Eurostat dataset code.
+        na_item: Population to count. Defaults to employees, which is the
+            population the minimum-wage bite is measured over.
         timeout_seconds: Request timeout.
 
     Returns:
-        Columns `activity` and `employment_thousands`.
+        Columns `activity`, `employment_thousands`, `reference_year` and
+        `population`. The last two travel with the data so a later stage can
+        refuse to combine weights with a composition frozen at another year, or
+        with a bite measured over a different population.
 
     Raises:
         requests.HTTPError: If the request fails.
@@ -222,7 +242,7 @@ def fetch_national_employment(
             "format": "JSON",
             "lang": "EN",
             "geo": country,
-            "na_item": "EMP_DC",
+            "na_item": na_item,
             "unit": "THS_PER",
             "time": str(year),
         },
@@ -232,10 +252,9 @@ def fetch_national_employment(
     response.raise_for_status()
     frame = _decode(json.loads(response.content))
 
-    return (
-        frame.rename(columns={"nace_r2": "activity", "value": "employment_thousands"})[
-            ["activity", "employment_thousands"]
-        ]
-        .sort_values("activity")
-        .reset_index(drop=True)
-    )
+    result = frame.rename(columns={"nace_r2": "activity", "value": "employment_thousands"})[
+        ["activity", "employment_thousands"]
+    ].sort_values("activity")
+    result["reference_year"] = year
+    result["population"] = na_item
+    return result.reset_index(drop=True)

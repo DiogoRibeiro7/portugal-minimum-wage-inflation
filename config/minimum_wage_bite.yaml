@@ -53,6 +53,22 @@ bite_by_activity:
 # survey reports the bite at, so each group's bite is the employment-weighted
 # mean of its sections, using national employment by NACE section.
 #
+# The weights count *employees* (Eurostat `nama_10_a64_e`, `na_item=SAL_DC`),
+# not total employment. The bite is a share of full-time employees, so weighting
+# it by a population that also contains the self-employed would give a sector
+# influence proportional to a headcount the bite was never measured over.
+# Agriculture and construction carry far more self-employment than finance, so
+# the mismatch would not wash out across sectors.
+#
+# Two differences between the populations remain and are not corrected. The
+# survey covers full-time employees while the weights count employees at any
+# hours, and the survey's reference month is October while the weights are an
+# annual average. Both are approximations. Weighting on total employment instead
+# moves the regional exposure spread by 0.04 percentage points and every group
+# bite by less than half a point, so neither is capable of changing the
+# conclusion the measure supports, which is that its spread is too small to
+# identify anything.
+#
 # `sections` lists the NACE sections a group contains -- all of them, including
 # those the survey does not cover. That completeness is the point. Listing only
 # the measured sections would let a group's bite be assigned to employment the

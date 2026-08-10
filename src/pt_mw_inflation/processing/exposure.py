@@ -634,12 +634,14 @@ def activity_bite_from_registry(
 
     Raises:
         ExposureError: If a group names an unknown activity or one with no
-            section mapping.
+            section mapping, or if employment is supplied but does not cover
+            every section the registry weights.
     """
     bite = registry["bite_by_activity"]
     section_of = registry["section_of_activity"]
 
     weights: dict[str, float] = {}
+    weighted_by_employment = national_employment is not None
     if national_employment is not None:
         _require_columns(
             "national_employment",
@@ -653,6 +655,26 @@ def activity_bite_from_registry(
                 strict=False,
             )
         )
+
+        # A section absent from the response would otherwise fall back to a
+        # weight of one thousand workers: not zero, not its true size, and small
+        # enough to look like a rounding artefact in the aggregate. An
+        # incomplete Eurostat response has to be a failure, because the numbers
+        # it produces are wrong in a way nothing downstream can detect.
+        required = {
+            code
+            for block in registry["nace_aggregates"].values()
+            for code in [
+                *block.get("sections", []),
+                *(section_of[name] for name in block.get("measured", []) if name in section_of),
+            ]
+        }
+        absent = sorted(required - weights.keys())
+        if absent:
+            raise ExposureError(
+                f"national employment is missing sections {absent}; "
+                "weighting them by default would silently distort every group they belong to"
+            )
 
     rows = []
     for group, block in registry["nace_aggregates"].items():
@@ -676,9 +698,14 @@ def activity_bite_from_registry(
             )
             continue
 
-        section_weights = [weights.get(section_of[name], 1.0) for name in measured]
+        # Without an employment frame every section counts once, which is right
+        # only where a group holds one section. The validation above guarantees
+        # that a supplied frame covers all of them, so the default is reached
+        # only in the unweighted mode.
+        default = 0.0 if weighted_by_employment else 1.0
+        section_weights = [weights.get(section_of[name], default) for name in measured]
         measured_weight = sum(section_weights)
-        group_weight = sum(weights.get(code, 1.0) for code in sections) or measured_weight
+        group_weight = sum(weights.get(code, default) for code in sections) or measured_weight
 
         weighted = (
             sum(bite[name] * weight for name, weight in zip(measured, section_weights, strict=True))
