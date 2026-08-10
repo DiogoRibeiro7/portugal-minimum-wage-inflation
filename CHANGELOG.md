@@ -87,9 +87,21 @@ was.
   acts themselves, together with the premium over the national wage.
 - `config/legal_acts.yaml`, the register of acts retrieved as primary sources.
 
+### Changed
 
-
-
+- The 2000 statutory values are read from Decreto-Lei n.º 573/99 rather than
+  taken from Eurostat. With that act and its domestic-service value included,
+  every stated increase in the published history reconciles with the act
+  preceding it, and no year is sourced to a secondary compiler.
+- `annual_minimum_wage` takes a geography. The panel holds both autonomous
+  regions under the general regime, so filtering on scope alone returned a
+  regional wage as the national one for every year a region legislated.
+- Packaging migrated to the PEP 621 `[project]` table, clearing the Poetry 2
+  deprecation warnings.
+- `poetry.lock` is now committed, so a rerun resolves to the same dependency
+  versions.
+- Dependency floors raised past known advisories: `lxml` to 6.1, `pyarrow` to
+  23.0.1, `pytest` to 9.0.3.
 - Source registry records licence terms and a verification date per source.
 - Provenance manifest uses forward-slash paths, so it is byte-identical across
   platforms for identical downloads.
