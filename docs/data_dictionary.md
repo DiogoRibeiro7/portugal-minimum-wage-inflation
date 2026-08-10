@@ -190,11 +190,47 @@ labelled accordingly. The correction fires only where the two compilers
 materially disagree, so genuine freezes such as 2012 and 2013 are left
 untouched.
 
-## Exposure and price panels
+## `data/processed/regional_price_panel.parquet`
 
-Not yet populated. The exposure panel depends on the GEP coverage tables, which
-the provider has withdrawn; see `config/sources.yaml` for the recorded
-citation and the reason the source is disabled.
+Consumer price indices by NUTS II region and consumption purpose, monthly.
+Built by `ptmw data ine-cpi` from Statistics Portugal indicator `0014659`.
+
+| Column | Meaning |
+| ------ | ------- |
+| `month` | First day of the reference month. |
+| `nuts_code` | NUTS II code, e.g. `PT11`, `PT20`. |
+| `region` | Region name as published. |
+| `category_code` | Consumption purpose code; `T` is the all-items total. |
+| `category` | Consumption purpose name. |
+| `price_index` | Price index, base 2025. |
+| `is_aggregate` | True for `PT` and `PT1`, which contain the other rows. |
+
+**Exclude aggregates from panel regressions.** `PT` (Portugal) and `PT1`
+(Continente) overlap their own components, so including them alongside the
+regions counts most observations twice.
+
+INE publishes geographic codes as NUTS codes without the country prefix, except
+that the autonomous regions appear as single digits: `2` is the Azores (`PT20`)
+and `3` is Madeira (`PT30`). Those two are exactly the geographies with their
+own statutory minimum wage, so a mapping error there would misalign prices
+against policy.
+
+### Finding the indicator
+
+Indicator codes are retired without redirect when a series is rebased. The code
+the open-data catalogue still advertises for the 2012-base index now answers
+*"o código do indicador não existe"*. Live codes are confirmed against the
+catalogue at dados.gov.pt, which lists each indicator with its API URL.
+
+The API is rate limited and refuses connections rather than returning 429, so
+requests are paced and retried. Pacing, not retry count, is what lets a full
+history complete.
+
+## Exposure panel
+
+Still not populated. The exposure measure needs minimum-wage coverage by region
+and industry jointly, and no Portuguese source publishes that; see
+`docs/research_design.md` for the assessment and what would unblock it.
 
 ## Estimation output
 
