@@ -22,6 +22,7 @@ from pt_mw_inflation.processing.exposure import (
     activity_bite_from_registry,
     assess_identifying_variation,
     check_predetermined,
+    measure_variation_strength,
     require_regional_variation,
     shift_share_exposure,
 )
@@ -230,3 +231,64 @@ def test_registry_without_a_reference_period_is_refused() -> None:
 def test_partition_is_a_partition() -> None:
     """The configured activity list must not contain nested aggregates."""
     assert {"B-E", "C"} & set(NACE_PARTITION) != {"B-E", "C"}
+
+
+def test_variation_strength_separates_flat_from_dispersed() -> None:
+    """Distinct values are not the same thing as usable variation.
+
+    ``require_regional_variation`` accepts any measure whose regions differ,
+    which is a precondition and not a recommendation. The Portuguese measure
+    passes it and is still nearly flat, so the strength of the variation has to
+    be reported as a number rather than inferred from the guard having passed.
+    """
+    flat = pd.DataFrame(
+        {"region": ["A", "B", "C", "D"], "regional_bite_exposure": [0.200, 0.201, 0.202, 0.203]}
+    )
+    dispersed = pd.DataFrame(
+        {"region": ["A", "B", "C", "D"], "regional_bite_exposure": [0.05, 0.20, 0.35, 0.50]}
+    )
+
+    # The guard cannot tell these apart; both have distinct values everywhere.
+    for frame in (flat, dispersed):
+        require_regional_variation(frame, value_column="regional_bite_exposure")
+
+    weak = measure_variation_strength(flat)
+    strong = measure_variation_strength(dispersed)
+
+    assert weak.regions == 4
+    assert weak.spread == pytest.approx(0.003)
+    assert weak.coefficient_of_variation < 0.01
+    assert strong.coefficient_of_variation > 20 * weak.coefficient_of_variation
+
+
+def test_variation_strength_averages_within_region_before_measuring() -> None:
+    """A region appearing on several rows must not count as several regions.
+
+    An exposure frame carrying one row per region-category would otherwise
+    report its category count as a region count and understate how few clusters
+    the design actually has.
+    """
+    duplicated = pd.DataFrame(
+        {
+            "region": ["A", "A", "B", "B"],
+            "regional_bite_exposure": [0.10, 0.30, 0.50, 0.70],
+        }
+    )
+    strength = measure_variation_strength(duplicated)
+
+    assert strength.regions == 2
+    assert strength.spread == pytest.approx(0.40)
+
+
+def test_variation_strength_needs_more_than_one_region() -> None:
+    """Spread across a single region is not a quantity."""
+    single = pd.DataFrame({"region": ["A"], "regional_bite_exposure": [0.21]})
+    with pytest.raises(ExposureError, match="at least two regions"):
+        measure_variation_strength(single)
+
+
+def test_variation_strength_refuses_an_undefined_coefficient() -> None:
+    """A zero mean makes the coefficient of variation a division by zero."""
+    centred = pd.DataFrame({"region": ["A", "B"], "regional_bite_exposure": [-0.2, 0.2]})
+    with pytest.raises(ExposureError, match="coefficient of variation is undefined"):
+        measure_variation_strength(centred)
