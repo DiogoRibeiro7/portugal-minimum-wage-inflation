@@ -136,8 +136,12 @@ def annual_minimum_wage(
     questions and disagree whenever an act takes effect mid-year:
 
     ``minimum_wage_january``
-        The level legally in force on 1 January. This is the convention used
-        when a policy change is dated to the year it was announced for.
+        The level legally in force on 1 January, or missing where no wage was in
+        force on that date. It is missing in 1974, when the floor was introduced
+        on 27 May: the introduction of a wage floor is an event, not a
+        percentage increase over a previous floor, and treating it as one would
+        put a spurious growth rate into the first year of every series built on
+        this column.
     ``minimum_wage_mean``
         The level averaged over the days of the year. This is the convention
         that matches annual national-accounts aggregates, and it is the one to
@@ -202,7 +206,13 @@ def annual_minimum_wage(
     annual = pd.DataFrame(
         {
             "year": np.unique(year_values),
-            "minimum_wage_january": grouped.first().to_numpy(),
+            # The level in force on 1 January, not the first observed level of
+            # the year. Those differ in 1974: the wage was introduced on 27 May,
+            # so there was no January minimum wage, and taking the first
+            # non-null observation would report one.
+            "minimum_wage_january": daily.reindex(
+                pd.to_datetime([f"{year}-01-01" for year in np.unique(year_values)])
+            ).to_numpy(),
             "minimum_wage_mean": grouped.mean().to_numpy(),
             # 1974 is a partial year: the wage was introduced on 27 May, so no
             # statutory level existed for the first five months. Downstream code
@@ -214,7 +224,9 @@ def annual_minimum_wage(
     acts_per_year = dates.dt.year.value_counts()
     annual["statutory_acts"] = annual["year"].map(acts_per_year).fillna(0).astype(int)
     annual["scope"] = scope
-    return annual.dropna(subset=["minimum_wage_january"]).reset_index(drop=True)
+    # Retain a year in which any wage was in force. Dropping on the January
+    # column would remove 1974 entirely, when the floor existed from 27 May.
+    return annual.dropna(subset=["minimum_wage_mean"]).reset_index(drop=True)
 
 
 def reconcile_annual_with_eurostat(

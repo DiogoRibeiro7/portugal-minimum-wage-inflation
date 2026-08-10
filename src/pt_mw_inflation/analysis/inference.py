@@ -13,8 +13,11 @@ is visible rather than hidden:
 ``wild_cluster_bootstrap``
     The restricted wild bootstrap with cluster-level Rademacher weights. With
     ``G`` clusters there are only ``2**G`` distinct weight vectors, so when that
-    number is small the procedure enumerates all of them and the p-value is
-    exact rather than simulated.
+    number is small the procedure enumerates all of them, and the p-value
+    carries no simulation error. That is not the same as an exact
+    finite-sample test: validity still rests on the assumptions under which the
+    sign-flip distribution approximates the null, and enumeration removes only
+    the Monte Carlo component of the error.
 
 ``randomization_inference``
     Permutes the treatment across clusters and compares the observed statistic
@@ -247,10 +250,12 @@ def wild_cluster_bootstrap(
     if finite.size == 0 or not np.isfinite(observed_t):
         p_value = float("nan")
     else:
-        # The +1 keeps the p-value valid: the observed sample is itself one of
-        # the equally likely draws under the null.
         extreme = int(np.sum(np.abs(finite) >= abs(observed_t)))
-        p_value = (extreme + 1) / (finite.size + 1)
+        # When the whole sign space is enumerated the observed sample is the
+        # all-positive draw already inside it, so adding a further draw would
+        # correct for simulation noise that is not present. When draws are
+        # sampled, counting the observed sample is what keeps the p-value valid.
+        p_value = extreme / finite.size if exhaustive else (extreme + 1) / (finite.size + 1)
 
     return ClusterInference(
         coefficient=coefficient,

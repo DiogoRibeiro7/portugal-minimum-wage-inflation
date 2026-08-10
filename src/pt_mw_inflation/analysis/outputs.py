@@ -268,7 +268,11 @@ def write_headline_macros(macro: pd.DataFrame, path: Path) -> Path:
         "WageToProductivityMin": f"{macro['minimum_wage_to_productivity_index'].min():.1f}",
         "WageToProductivityMinYear": f"{trough_year}",
         "MeanResidualPct": f"{residual.mean() * 100:+.2f}",
-        "CumulativeResidualPct": f"{residual.sum() * 100:+.1f}",
+        # The compounded gap, not the sum of annual residuals. Summing them
+        # over fifty years at Portuguese inflation rates gives a figure beyond
+        # -100 per cent, which cannot be read as a cumulative shortfall.
+        "CumulativeGapPct": f"{float(macro['cumulative_policy_gap'].iloc[-1]) * 100:+.1f}",
+        "SummedResidualPct": f"{residual.sum() * 100:+.1f}",
         "ObservedYears": f"{len(macro)}",
     }
 
