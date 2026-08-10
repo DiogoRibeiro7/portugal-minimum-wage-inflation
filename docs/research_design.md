@@ -178,63 +178,56 @@ Do not write a causal conclusion unless all of the following hold:
 6. the result survives alternative exposure definitions;
 7. the long-run macro layer and panel layer tell a coherent story without forcing agreement.
 
-## Feasibility of the region-by-industry exposure measure
+## The region-by-industry exposure measure, revisited
 
-The exposure design requires a predetermined bite $b_{rs,0}$ that varies over
-both regions and industries. The Portuguese sources that survive do not supply
-one, and the gap is structural rather than a matter of effort.
+An earlier version of this document concluded that the exposure design was
+blocked because no source published minimum-wage coverage by region and
+industry jointly. **That conclusion was wrong**, and it is recorded here rather
+than quietly removed, because the way it was reached is instructive.
 
-**What exists.** The GEP monitoring reports give the share of full-time
-employees paid the minimum wage **by economic activity, for the country as a
-whole**. The variation across industries is large and real: in October 2017 it
-ranged from 0.6 per cent in electricity and gas to 35.1 per cent in
-accommodation and food, against a national average of 21.6 per cent. The
-Quadros de Pessoal series gives employment **by economic activity** and,
-separately, **by district**.
+It was drawn from the Portuguese labour-ministry publications alone. None of the
+33 tables in the recovered Quadros de Pessoal series crosses a regional with an
+industry dimension, which is true, and it was generalised to "no source does",
+which is false. Eurostat's regional accounts publish employment by NUTS II
+region and NACE activity for Portugal from 2000 (`nama_10r_3empers`).
 
-**What does not exist.** None of the 33 tables in the Quadros de Pessoal series
-crosses a regional dimension with an industry dimension. Every regional table is
-a marginal by district with no industry detail, and every industry table is
-national.
+**What is and is not observed.** The shift-share measure
 
-**Why the marginals cannot substitute.** The shift-share alternative aggregates
-national industry bites with regional industry weights,
-$B_r = \sum_s w_{rs} b_s$. Recovering $w_{rs}$ from separate regional and
-industry totals requires assuming that region and industry are independent,
-which sets $w_{rs} = w_s$ and gives every region the national industry mix. The
-resulting exposure is then *numerically identical in every region*, to
-floating-point exactness. It would populate the column, pass every range check,
-and identify nothing: the regressor would be absorbed by the fixed effects or
-carry a coefficient estimated from no variation at all.
+```text
+B_r = sum_s q_rs,0 * b_s,0
+```
 
-`construct_regional_bite` implements the shift-share aggregation for the case
-where a genuine cross-tabulation is available, and `require_regional_variation`
-refuses an exposure whose between-region variance share is zero. The test suite
-demonstrates both branches, including that the marginal-derived construction
-collapses to a single value.
+needs regional industry composition `q_rs,0` and an industry bite `b_s,0`. The
+composition is observed. The bite is observed nationally, from the GEP
+monitoring reports, and is *not* observed regionally. Holding it constant within
+industry is the measure's maintained assumption, and it is substantive:
+accommodation and food service carries by far the highest bite, and Portuguese
+regions differ in both how much of it they have and what it pays. The assumption
+attenuates exactly the variation the design exploits.
 
-**Even with a cross-tabulation, the assumption is substantive.** Holding the
-bite constant within an industry across regions attenuates precisely the
-variation the design exploits, because accommodation and food --- the highest-bite
-industry by a wide margin --- differs across Portuguese regions in both its size
-and its wage distribution. Anything built this way belongs in the robustness
-section as an explicitly labelled variant, never in the baseline.
+So the design is constrained by an assumption, not blocked by missing data.
+Those are different positions and the earlier document asserted the wrong one.
 
-**Consequences for identification.** Portuguese statutory changes are national
-on the mainland. If exposure carries no regional variation, the only remaining
-variation is across consumption categories interacting with a common national
-shock. That is a coherent design, and it is a different one: with calendar-time
-fixed effects it identifies *relative* pass-through across categories rather
-than its level, and inference can no longer rest on regional clusters, since the
-effective number of independent shocks is the number of statutory changes. It is
-not a substitute for the regional design and is not reported as one.
+**What the measure delivers.** Frozen on 2015 composition, exposure ranges from
+18.4 per cent in Norte to 20.5 per cent in the Algarve, with every one of the
+nine regions taking a distinct value. The regional composition behind it varies
+sharply: the Algarve has 38.8 per cent of employment in trade, transport,
+accommodation and food service against the Alentejo's 20.5, while the Alentejo
+has 22.0 per cent in agriculture against Grande Lisboa's 0.7.
 
-**What would unblock the specified design.** Any of: minimum-wage coverage
-published by NUTS II region and economic activity jointly; Quadros de Pessoal
-microdata, from which the cross-tabulation can be built directly; or the Madeira
-and Azores statutory schedules, which would restore genuine regional variation
-in the policy change itself and make a national bite far less damaging.
+**Two limits to state when using it.** The published bite excludes agriculture
+and public administration, so between 78 and 99 per cent of a region's
+employment carries a measured bite; the covered share is returned alongside the
+exposure rather than renormalised away silently. And the regional accounts
+publish employment at coarser activity groups than the survey reports the bite
+at, so each group takes an unweighted mean of its sections. That compresses the
+spread, most visibly for industry, where manufacturing's high bite is averaged
+with a near-zero-bite utility sector.
 
+`require_regional_variation` accepts this measure, having rejected the
+marginals-derived construction it replaces. The guard was right about the old
+input and says nothing about whether the assumption above is sound; that is a
+judgement for the reader, which is why it is stated here rather than buried.
 
 ## Regional policy variation, recovered
 

@@ -1,0 +1,85 @@
+# Share of full-time employees paid the guaranteed minimum wage, by economic
+# activity, for the country as a whole.
+#
+# Source: GEP/MTSSS, 10th monitoring report on the RMMG agreement (November
+# 2018), Table 13, drawn from the Inquérito aos Ganhos e à Duração do Trabalho.
+# Values are per cent, October 2017, the most recent column of that table.
+#
+# Two limitations that shape how this may be used.
+#
+# The survey excludes agriculture (CAE section A) and public administration
+# (section O), so those activities have no measured bite. They are left absent
+# rather than assumed, and the exposure builder reports how much employment
+# that leaves uncovered.
+#
+# The bite is national. Applying it to regional employment composition is the
+# maintained assumption of the shift-share measure: within-industry coverage is
+# taken not to vary across regions. Accommodation and food service has by far
+# the highest bite and differs across Portuguese regions in both its size and
+# its wage distribution, so the assumption attenuates precisely the variation
+# the design exploits.
+
+source:
+  publication: >-
+    GEP/MTSSS, Retribuição Mínima Mensal Garantida, 10.º Relatório de
+    Acompanhamento do Acordo, November 2018, Table 13.
+  reference_period: 2017-10
+  survey: Inquérito aos Ganhos e à Duração do Trabalho
+  national_total: 21.6
+
+# Keyed by CAE Rev. 3 section name rather than letter: the letters and names are
+# misaligned in the published table's text layer, and mapping by letter assigns
+# the accommodation bite to transport.
+bite_by_activity:
+  Indústrias Extrativas: 13.4
+  Indústrias Transformadoras: 24.4
+  Eletricidade, Gás, Vapor, Água Quente e Fria e Ar: 0.6
+  Captação, Tratamento e Distribuição de Água: 16.3
+  Construção: 24.4
+  Comércio por Grosso e Retalho: 20.1
+  Transportes e Armazenagem: 14.6
+  Alojamento e Restauração: 35.9
+  Atividades de Informação e Comunicação: 4.6
+  Atividades Financeiras e de Seguros: 1.3
+  Atividades Imobiliárias: 19.1
+  Atividades de Consultadoria: 7.9
+  Atividades Administrativas e dos Serviços de Apoio: 28.8
+  Educação: 9.4
+  Atividades de Saúde Humana e de Apoio Social: 24.8
+  Atividades Artísticas, De Espetáculos, Desportivas e Recreativas: 19.7
+  Outras Atividades de Serviços: 26.9
+
+# Eurostat regional accounts publish employment at coarser aggregates than the
+# survey reports the bite at, so each aggregate takes the mean of the sections
+# it contains. That is an unweighted mean: national employment by CAE section is
+# not among the series retrieved here, so the shares needed to weight it are not
+# available. The approximation matters most for B-E, where manufacturing
+# dominates employment but is averaged with a near-zero-bite utility sector.
+nace_aggregates:
+  A: []
+  B-E:
+    - Indústrias Extrativas
+    - Indústrias Transformadoras
+    - Eletricidade, Gás, Vapor, Água Quente e Fria e Ar
+    - Captação, Tratamento e Distribuição de Água
+  F:
+    - Construção
+  G-I:
+    - Comércio por Grosso e Retalho
+    - Transportes e Armazenagem
+    - Alojamento e Restauração
+  J:
+    - Atividades de Informação e Comunicação
+  K:
+    - Atividades Financeiras e de Seguros
+  L:
+    - Atividades Imobiliárias
+  M_N:
+    - Atividades de Consultadoria
+    - Atividades Administrativas e dos Serviços de Apoio
+  O-Q:
+    - Educação
+    - Atividades de Saúde Humana e de Apoio Social
+  R-U:
+    - Atividades Artísticas, De Espetáculos, Desportivas e Recreativas
+    - Outras Atividades de Serviços

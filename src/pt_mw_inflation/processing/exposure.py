@@ -27,6 +27,7 @@ category.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -495,3 +496,89 @@ def require_regional_variation(
             "identical."
         )
     return diagnostic
+
+
+def activity_bite_from_registry(registry: dict[str, Any]) -> pd.DataFrame:
+    """Aggregate the published bite to the activity groups employment uses.
+
+    The survey reports the bite at a finer activity breakdown than the regional
+    accounts publish employment at, so each group takes the mean of the sections
+    it contains. Groups with no measured section -- agriculture and public
+    administration are outside the survey -- are returned as missing rather than
+    as zero, since an unmeasured bite is not an absent one.
+
+    Args:
+        registry: Parsed `config/minimum_wage_bite.yaml`.
+
+    Returns:
+        Columns `industry` and `minimum_wage_bite`, the bite as a proportion.
+
+    Raises:
+        ExposureError: If a group names a section the bite table does not carry.
+    """
+    bite = registry["bite_by_activity"]
+    rows = []
+    for group, sections in registry["nace_aggregates"].items():
+        missing = [section for section in sections if section not in bite]
+        if missing:
+            raise ExposureError(f"{group} names unknown activities: {missing}")
+        if not sections:
+            rows.append({"industry": group, "minimum_wage_bite": float("nan")})
+            continue
+        rows.append(
+            {
+                "industry": group,
+                "minimum_wage_bite": sum(bite[s] for s in sections) / len(sections) / 100.0,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def shift_share_exposure(
+    shares: pd.DataFrame,
+    activity_bite: pd.DataFrame,
+    *,
+    share_column: str = "employment_share",
+) -> pd.DataFrame:
+    """Combine regional industry composition with the national industry bite.
+
+    This is the measure a previous version of this project recorded as
+    impossible to build. Regional composition comes from the regional accounts;
+    the bite is national and is held constant within industry, which is the
+    measure's maintained assumption rather than a property of the data.
+
+    Args:
+        shares: Regional employment shares by activity.
+        activity_bite: National bite by activity.
+        share_column: Column holding the employment share.
+
+    Returns:
+        One row per region, with the exposure and the share of regional
+        employment for which a bite was measured. A region whose covered share
+        is low has an exposure resting on a minority of its workers, and the
+        column is returned so that can be judged rather than assumed away.
+
+    Raises:
+        ExposureError: If required columns are missing or nothing merges.
+    """
+    _require_columns("shares", shares, frozenset({"region", "activity", share_column}))
+    _require_columns("activity_bite", activity_bite, frozenset({"industry", "minimum_wage_bite"}))
+
+    merged = shares.merge(
+        activity_bite, left_on="activity", right_on="industry", how="left", validate="many_to_one"
+    )
+    if merged.empty:
+        raise ExposureError("no activities merged; check the activity coding")
+
+    measured = merged.dropna(subset=["minimum_wage_bite"]).copy()
+    measured["contribution"] = measured[share_column] * measured["minimum_wage_bite"]
+
+    exposure = measured.groupby("region", as_index=False).agg(
+        cost_exposure=("contribution", "sum"),
+        covered_employment_share=(share_column, "sum"),
+    )
+    # Renormalise onto measured employment, so a region is not scored low merely
+    # because more of its workforce sits outside the survey's scope.
+    exposure["cost_exposure"] = exposure["cost_exposure"] / exposure["covered_employment_share"]
+    exposure["exposure_definition"] = "shift_share_national_bite"
+    return exposure.sort_values("region").reset_index(drop=True)
