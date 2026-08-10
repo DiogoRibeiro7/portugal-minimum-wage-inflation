@@ -14,6 +14,33 @@ attainable with the variation Portugal supplies, and the reasons are recorded
 below rather than treated as unfinished work. Stating them is more useful to a
 reader than a weakly identified estimate.
 
+### Read this before the rest
+
+The document is layered: it records positions in the order they were reached,
+including one that was later shown to be wrong, because how it was reached is
+worth keeping. The current position is this, and it supersedes anything below
+that conflicts with it.
+
+- The exposure design is **not** blocked by missing data. Regional industry
+  composition is published by Eurostat and the national minimum-wage bite by
+  activity is recoverable from the labour ministry, so the shift-share measure
+  is constructible and is constructed. The section *The region-by-industry
+  exposure measure, revisited* corrects the earlier claim to the contrary, and
+  the earlier claim is left in place, marked, rather than edited out.
+- The exposure design **is** blocked by two other things. The measure spans 1.83
+  percentage points across nine regions with a coefficient of variation of
+  0.025, which identifies a regional effect in principle and nothing in
+  practice; and the published bite post-dates the 2015 policy restart, so it is
+  not predetermined for the episode with the most policy variation.
+- Regional *policy* variation exists but is thin: three identifying
+  region-months in one region, which conventional inference calls significant at
+  six horizons and the bootstrap at none.
+
+The net objective is unchanged, but the reason for it is different from the one
+stated when it was written. The causal layer fails because the variation is too
+small, not because the data does not exist. Those are different claims, and the
+paper now makes the second.
+
 ## Contribution architecture
 
 ### Contribution 1: the statutory series, from primary law
@@ -47,12 +74,18 @@ not causal and is not presented as such.
 ### Contribution 3: a documented negative identification result
 
 An account of why regional variation cannot identify pass-through in Portugal,
-specific enough to be checked:
+specific enough to be checked. The claim is about the size of the variation, not
+the availability of data, and every part of it is measured rather than asserted:
 
 - the Azorean supplement is proportional, so in logs the Azorean statutory
   change equals the mainland's in every month after it took effect, and the
   region contributes no independent timing;
 - Madeira is the only source of genuine divergence;
+- the shift-share exposure measure that would substitute for policy variation is
+  built and reported, and spans 1.83 percentage points across nine regions,
+  which is too flat to identify a price response; the constraint is that the
+  Portuguese wage floor binds at broadly similar rates across industries, so
+  industry mix carries little information about exposure to it;
 - with the small number of Portuguese regions, conventional cluster-robust
   inference rejects a true null far above its nominal size, and the estimates it
   calls highly significant survive none of a wild cluster bootstrap;
@@ -80,9 +113,11 @@ prices.
 
 The original standard required pre-trend diagnostics, small-cluster inference,
 predetermined exposure and robustness to alternative exposure definitions before
-any causal conclusion. That standard is retained and is not met, which is why no
-causal conclusion is drawn. The revised standard for what the paper does claim
-is narrower and is met:
+any causal conclusion. That standard is retained and is not met — small-cluster
+inference is implemented and rejects nothing, and predetermination is enforced
+and refuses the one episode worth estimating — which is why no causal conclusion
+is drawn. The revised standard for what the paper does claim is narrower and is
+met:
 
 1. every statutory value is traceable to the act that set it;
 2. every price and productivity series is retrieved reproducibly and checksummed;
@@ -243,7 +278,7 @@ is correct: estimating that episode needs an earlier GEP snapshot, not a
 different argument.
 
 **Whether the variation is strong enough is a separate question.** The spread is
-1.83 percentage points and the coefficient of variation 0.027. Nine distinct
+1.83 percentage points and the coefficient of variation 0.025. Nine distinct
 values establish that a regional effect is identified in principle;
 they do not establish that it is identified precisely enough to be informative,
 and `require_regional_variation` answers only the first question.

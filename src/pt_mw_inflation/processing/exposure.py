@@ -461,6 +461,71 @@ def assess_identifying_variation(
     )
 
 
+@dataclass(frozen=True)
+class VariationStrength:
+    """How much usable spread an exposure measure carries, not merely whether any."""
+
+    coefficient_of_variation: float
+    spread: float
+    interquartile_spread: float
+    regions: int
+    detail: str
+
+
+def measure_variation_strength(
+    frame: pd.DataFrame,
+    *,
+    value_column: str = "regional_bite_exposure",
+    region_column: str = "region",
+) -> VariationStrength:
+    """Quantify the spread of an exposure measure across regions.
+
+    :func:`assess_identifying_variation` answers whether the measure varies at
+    all, which is a precondition and not a recommendation. A measure can take a
+    distinct value in every region and still be too flat to estimate anything
+    from once fixed effects have absorbed the level. This reports the size of
+    the variation so that judgement can be made on a number.
+
+    Args:
+        frame: Exposure by region.
+        value_column: Column holding the exposure.
+        region_column: Column identifying the region.
+
+    Returns:
+        The coefficient of variation, the high-low spread, and the
+        interquartile spread, which is the more robust of the two when one
+        region is unusual.
+
+    Raises:
+        ExposureError: If the columns are absent, fewer than two regions are
+            present, or the mean is zero and the coefficient undefined.
+    """
+    _require_columns("exposure", frame, frozenset({value_column, region_column}))
+
+    values = frame.groupby(region_column)[value_column].mean().astype(float)
+    if values.size < 2:
+        raise ExposureError(f"at least two regions are required, found {values.size}")
+
+    mean = float(values.mean())
+    if mean == 0.0:
+        raise ExposureError("mean exposure is zero; the coefficient of variation is undefined")
+
+    coefficient = float(values.std(ddof=0)) / abs(mean)
+    spread = float(values.max() - values.min())
+    interquartile = float(values.quantile(0.75) - values.quantile(0.25))
+
+    return VariationStrength(
+        coefficient_of_variation=coefficient,
+        spread=spread,
+        interquartile_spread=interquartile,
+        regions=int(values.size),
+        detail=(
+            f"coefficient of variation {coefficient:.3f} across {values.size} regions; "
+            f"high-low spread {spread:.4f}"
+        ),
+    )
+
+
 def require_regional_variation(
     frame: pd.DataFrame,
     *,

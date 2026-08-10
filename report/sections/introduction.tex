@@ -7,20 +7,27 @@ the revolution, at 3\,300 escudos a month. Over the
 of more than fifty. Its real value tells a different story, and that story is
 the subject of this paper.
 
-We assemble the statutory history from primary law -- every act retrieved from
-the Diário da República and read for the value it sets -- and combine it with a
-consumer price index and a productivity series that both reach back to the
-1960s. Three findings follow.
+We assemble the statutory history from the official register of acts maintained
+by the labour ministry, which lists one row per act with its effective date and
+the value it set, and reconcile every value against the increase the register
+itself states and against Eurostat's independent reading of the same law. The
+autonomous regions' schedules, which the register does not carry, are retrieved
+act by act from the Diário da República. We combine the result with a consumer
+price index and a productivity series that both reach back to the 1960s. Three
+findings follow.
 
 The first is a matter of arithmetic, and it is the paper's central fact. Indexed
 to \MacroFirstYear{}, labour productivity reached \ProductivityIndexEnd{} by
 \MacroLastYear{} while the real minimum wage reached \RealWageIndexEnd{}. The
 real wage floor fell through the inflation of the late 1970s and early 1980s and
 did not regain its introductory level for roughly four decades. Measured against
-output per worker, it bottomed at \WageToProductivityMin{} in
+output per person employed, it bottomed at \WageToProductivityMin{} in
 \WageToProductivityMinYear{} and stood at \WageToProductivityEnd{} at the end of
-the sample: an hour of minimum-wage work commands about half the share of
-national output it did when the floor was created.
+the sample: the wage floor now claims about half the share of output per worker
+that it claimed when it was created. Neither series is hourly --- the statutory
+wage is a monthly amount and productivity is output per person employed --- so
+the comparison holds hours per worker fixed, and is a statement about the
+annual earnings of a full-time minimum-wage job rather than about a wage rate.
 
 The second concerns policy rather than outcomes. Decomposing statutory growth
 against a benchmark that compounds productivity growth with the previous year's
@@ -45,6 +52,16 @@ Portuguese regions, cluster-robust inference rejects a true null far above its
 nominal size, and the estimates that conventional standard errors call highly
 significant survive none of a wild cluster bootstrap.
 
+The usual substitute for regional policy variation is regional exposure to a
+common national change, and we build it rather than assert that it is
+unavailable: Eurostat's regional accounts supply industry composition by
+NUTS~II region and the labour ministry's monitoring reports supply the
+minimum-wage bite by activity. The resulting shift-share measure takes a
+distinct value in each of the \ExposureRegions{} NUTS~II regions and spans
+\ExposureSpreadPP{}~percentage points, which is too narrow a range to identify
+a price response. That is a fact about how little the bite varies across
+industries in Portugal, not a missing dataset, and it is reported as such.
+
 We therefore make no causal claim about pass-through, and explain in
 Section~\ref{sec:robustness} what would be required to support one. What the
 paper offers instead is a measured long-run account of a policy whose real
@@ -56,6 +73,7 @@ work on Portuguese minimum wages relies on secondary compilations that flatten
 features of the law: that three legally distinct minimum wages coexisted until
 1991 and two until 2004, that the published official history omits the act
 effective in 2000, and that the two autonomous regions set their wages by
-different mechanisms. Each is documented here and each is read from the act
-itself. The series, the regional schedules and the pipeline that builds them are
-released with the paper.
+different mechanisms. Each is documented here, and the regional schedules that
+carry the last of them are read from the acts themselves. The series, the
+regional schedules and the pipeline that builds them are released with the
+paper.

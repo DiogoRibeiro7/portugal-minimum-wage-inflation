@@ -38,8 +38,8 @@ in this situation, and that a wild cluster bootstrap corrects it, is established
 \citep{cameron2008bootstrap}. In simulation with seven clusters and a
 true null, the conventional test rejects at the five per cent level about twenty
 per cent of the time, while a restricted wild cluster bootstrap holds its size.
-With so few clusters the bootstrap can enumerate the entire space of sign
-vectors, so its $p$-value is exact rather than simulated.
+The estimation panel below has \BootstrapClusters{} clusters, and at that count
+the procedure \BootstrapBasis{}.
 
 This is not a refinement. It is the difference between a result and an artefact,
 and Table~\ref{tab:regional-design} shows it on the actual data.
@@ -67,15 +67,48 @@ by more than the wage shock itself. An estimate identified by
 picking up whatever else was happening in Madeira, and the bootstrap is
 detecting exactly that.
 
-\subsection{The alternative design, and why it also falls short}
+\subsection{The exposure design, built, and why it is too flat}
 
-If regional variation is unavailable, the remaining variation is across
-consumption categories facing a common national change. Rather than impose an
-exposure measure -- one that would require minimum-wage coverage by region and
-industry jointly, that no Portuguese source publishes, and whose shift-share
-construction carries assumptions of its own
-\citep{goldsmithpinkham2020bartik} -- the differential response can be estimated
-directly, one coefficient per category.
+The standard substitute for regional policy variation is regional exposure to a
+common national change: a region whose employment sits disproportionately in
+low-paying industries faces a larger effective shock. Writing $q_{rs,0}$ for
+region $r$'s baseline employment share in industry $s$ and $b_{s,0}$ for the
+national share of employees paid the minimum wage in that industry, exposure is
+$B_{r} = \sum_{s} q_{rs,0}\, b_{s,0}$ \citep{goldsmithpinkham2020bartik}.
+
+Both terms are available, and we report the measure rather than assert that it
+cannot be had. Eurostat's regional accounts give $q_{rs,0}$ for the
+\ExposureRegions{} NUTS~II regions and the monitoring reports of
+Section~\ref{sec:data} give $b_{s,0}$ nationally. The regional accounts publish
+coarser activity groups than the bite is measured at, so each group's bite is
+the mean of its sections weighted by national employment in them; taken
+unweighted the mean puts manufacturing on equal footing with a near-empty
+utilities sector, and reverses the regional ordering.
+
+Frozen on 2015 composition, exposure takes a distinct value in every region,
+running from \ExposureMinPct{} to \ExposureMaxPct{}~per cent. That is the whole
+difficulty. The high-low spread is \ExposureSpreadPP{}~percentage points and the
+coefficient of variation is \ExposureCV{}. Regional industry composition varies
+a great deal in Portugal --- the Algarve holds nearly twice the Alentejo's share
+of employment in trade, transport and hospitality, and the Alentejo holds thirty
+times Grande Lisboa's share in agriculture --- but the bite does not differ
+enough between industries for composition to translate that into much dispersion
+in exposure. Distinct values in every region establish that a regional effect is
+identified in principle; they do not establish that it is identified precisely
+enough to be informative, and this spread is not.
+
+The constraint is therefore not a missing dataset. It is that the Portuguese
+minimum wage binds at broadly similar rates across most of the economy, so
+industry mix is a weak instrument for exposure to it. Publishing the bite by
+region would change this; publishing more of the same national bite would not.
+
+\subsection{The category-differential design, and why it also falls short}
+
+The remaining variation is across consumption categories facing a common
+national change, with the differential response estimated directly, one
+coefficient per category. It is reported alongside the exposure measure because
+it does not inherit the assumption that within-industry coverage is constant
+across regions.
 
 That design cannot carry calendar-time fixed effects, because a national shock
 does not vary across regions within a month; time effects would absorb it
@@ -93,8 +126,16 @@ whatever corrupts one category may be moving the others less visibly.
 
 Three things, in descending order of value. Registering Madeira's acts for
 2010--2018, 2021 and 2022, each from primary law, would roughly quadruple the
-identifying events. Minimum-wage coverage published by NUTS~II region and
-economic activity jointly would permit the exposure design the literature
-favours. And a longer regional price series at consumption-purpose detail would
-allow pre-trend testing over a window long enough to be informative. None of
-these is unobtainable; none is available now.
+identifying events, and is a retrieval problem rather than a measurement one.
+Minimum-wage coverage published by NUTS~II region and economic activity jointly
+would remove the assumption the exposure measure rests on and, more importantly,
+could widen a spread that industry mix alone cannot. And a longer regional price
+series at consumption-purpose detail would allow pre-trend testing over a window
+long enough to be informative.
+
+A fourth would help the exposure design without rescuing it. The published bite
+dates from \ExposureBitePeriod{} and so post-dates the 2015 restart of statutory
+increases, which is the episode with the most policy variation to exploit; an
+earlier monitoring report would make exposure predetermined for it. It would not
+widen the \ExposureSpreadPP{}~percentage-point spread, and that, not the dating,
+is the binding constraint.

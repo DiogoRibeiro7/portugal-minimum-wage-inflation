@@ -9,7 +9,7 @@ help:
 	@echo "test       pytest"
 	@echo "coverage   pytest with a terminal coverage report"
 	@echo "check      lint + typecheck + test (what CI runs)"
-	@echo "paper      Rebuild datasets, regenerate outputs, compile the manuscript"
+	@echo "paper      Rebuild every dataset, regenerate all outputs, compile the manuscript"
 	@echo "clean      Remove caches and build artefacts"
 
 install:
@@ -41,9 +41,13 @@ check: lint typecheck test
 # has to run before LaTeX does.
 paper:
 	poetry run ptmw data download-sources
+	poetry run ptmw data ine-cpi
+	poetry run ptmw data regional-employment
 	poetry run ptmw build minimum-wage
 	poetry run ptmw build macro
+	poetry run ptmw build regional-exposure
 	poetry run ptmw analyse macro
+	poetry run ptmw analyse pass-through
 	# LaTeX resolves citations and cross-references across passes, and bibtex
 	# runs between them. A single pass leaves the bibliography empty and every
 	# citation unresolved, which is how the references silently went missing.

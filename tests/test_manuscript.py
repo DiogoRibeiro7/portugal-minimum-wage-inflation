@@ -107,6 +107,57 @@ def test_empirical_sections_use_macros_not_literals(section: str) -> None:
     assert not decimals, f"{section} hard-codes numeric results: {decimals}"
 
 
+#: Ways of asserting that the region-by-industry exposure measure cannot be
+#: built. Each is a claim the repository made and then disproved by building it,
+#: so the phrasing is pinned rather than the sentiment: a section may say the
+#: measure is uninformative, assumption-laden or not predetermined, but it may
+#: not say the ingredients do not exist.
+_UNAVAILABILITY_CLAIMS = (
+    "no Portuguese source publishes",
+    "that no source publishes",
+    "no source crosses",
+    "is not made here",
+    "not reported in this version",
+    "required by that design is available",
+)
+
+
+def test_no_section_claims_the_exposure_measure_cannot_be_built() -> None:
+    """The prose may not say the exposure data is missing while the code uses it.
+
+    This is the defect that recurred: a conclusion drawn from the labour-ministry
+    publications alone was generalised to every source, the manuscript was
+    written on it, and the manuscript kept saying so after Eurostat's regional
+    accounts had been wired into the pipeline and the measure built. Prose and
+    pipeline drifted apart silently because nothing compared them.
+
+    The test is deliberately tied to the builder existing. If the shift-share
+    construction is ever removed, the claim becomes true again and this stops
+    applying.
+
+    Whitespace is collapsed before matching. LaTeX prose is hard-wrapped, so a
+    phrase of more than two words is as likely as not to be split by a newline,
+    and a raw substring search would pass on exactly the sentences it is meant
+    to catch.
+    """
+    pytest.importorskip("pt_mw_inflation.processing.exposure")
+    from pt_mw_inflation.processing.exposure import shift_share_exposure
+
+    assert callable(shift_share_exposure)
+
+    offending: dict[str, list[str]] = {}
+    for name, text in _section_text().items():
+        flattened = " ".join(text.split())
+        found = [claim for claim in _UNAVAILABILITY_CLAIMS if claim in flattened]
+        if found:
+            offending[name] = found
+
+    assert not offending, (
+        "sections assert the exposure measure is unbuildable while the pipeline "
+        f"builds it: {offending}"
+    )
+
+
 def test_results_section_states_what_is_not_established() -> None:
     """The descriptive layer must not be left to read as a causal claim."""
     text = (SECTIONS / "results.tex").read_text(encoding="utf-8")
