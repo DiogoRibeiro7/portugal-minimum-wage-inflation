@@ -126,6 +126,7 @@ def annual_minimum_wage(
     panel: pd.DataFrame,
     *,
     scope: str = "general",
+    geography: str = "PT",
     start_year: int | None = None,
     end_year: int | None = None,
 ) -> pd.DataFrame:
@@ -148,6 +149,10 @@ def annual_minimum_wage(
     Args:
         panel: Output of :func:`build_statutory_panel`.
         scope: Which legal regime to extract.
+        geography: Which geography to extract. The panel holds the autonomous
+            regions alongside the mainland, all under the general regime, so
+            filtering on scope alone would silently return a regional wage as
+            the national one for every year a region legislated.
         start_year: First year of the returned series. Defaults to the year of
             the first act.
         end_year: Last year of the returned series. Defaults to the last year
@@ -159,9 +164,23 @@ def annual_minimum_wage(
     Raises:
         ValueError: If the requested scope is absent from the panel.
     """
-    selected = panel.loc[panel["scope"] == scope].copy()
+    selected = panel.loc[panel["scope"] == scope]
+    if "geography" in panel.columns:
+        selected = selected.loc[selected["geography"] == geography]
+    selected = selected.copy()
     if selected.empty:
-        raise ValueError(f"scope {scope!r} not present in the panel")
+        available = sorted(panel.get("geography", pd.Series(dtype=str)).unique())
+        raise ValueError(
+            f"no rows for scope {scope!r} and geography {geography!r}"
+            + (f"; geographies present: {available}" if available else "")
+        )
+
+    duplicated = selected.duplicated(subset=["effective_date"])
+    if duplicated.any():
+        raise ValueError(
+            f"{int(duplicated.sum())} duplicate effective dates for scope {scope!r} "
+            f"and geography {geography!r}; one date cannot have two levels"
+        )
 
     selected = selected.sort_values("effective_date")
     dates = pd.to_datetime(selected["effective_date"])

@@ -87,14 +87,8 @@ was.
   acts themselves, together with the premium over the national wage.
 - `config/legal_acts.yaml`, the register of acts retrieved as primary sources.
 
-### Changed
 
-- The 2000 statutory values are read from Decreto-Lei n.º 573/99 rather than
-  taken from Eurostat. With that act and its domestic-service value included,
-  every stated increase in the published history reconciles with the act
-  preceding it, and no year is sourced to a secondary compiler.
 
-### Changed
 
 - Source registry records licence terms and a verification date per source.
 - Provenance manifest uses forward-slash paths, so it is byte-identical across

@@ -128,7 +128,7 @@ def test_levels_agree_with_the_independent_eurostat_series(
 
 def test_unknown_scope_is_rejected(panel: pd.DataFrame) -> None:
     """Asking for a regime that does not exist is an error, not an empty frame."""
-    with pytest.raises(ValueError, match="not present"):
+    with pytest.raises(ValueError, match="no rows for scope"):
         annual_minimum_wage(panel, scope="fishing")
 
 

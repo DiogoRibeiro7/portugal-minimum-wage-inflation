@@ -197,7 +197,12 @@ def build_regional_panel(
     for name, config in registry.items():
         mechanism = config["mechanism"]
         geography = config["geography"]
-        jurisdiction = "m" if name == "madeira" else "a"
+        # Read from the registry rather than inferred from the key: regional
+        # decrees are numbered per region, so fetching the wrong jurisdiction
+        # returns a real but unrelated act and succeeds silently.
+        jurisdiction = config.get("jurisdiction")
+        if not jurisdiction:
+            raise RegionalScheduleError(f"{name}: registry entry declares no jurisdiction")
 
         if mechanism == "explicit_value":
             wages.extend(
@@ -263,6 +268,21 @@ def regional_premium(regional: pd.DataFrame, national_annual: pd.DataFrame) -> p
 
     frame = regional.copy()
     frame["year"] = pd.to_datetime(frame["effective_date"]).dt.year
+
+    # A region that does not legislate in a given year keeps the level it last
+    # set, while the national wage usually rises. Those are exactly the years
+    # the premium narrows, so joining only on act years would drop them and
+    # overstate the premium's stability.
+    span = national_annual.loc[national_annual["year"] >= int(frame["year"].min()), ["year"]]
+    carried = []
+    for geography, block in frame.groupby("geography"):
+        filled = span.merge(block, on="year", how="left").sort_values("year")
+        filled["geography"] = geography
+        for column in ("minimum_wage_monthly_eur", "legal_source"):
+            filled[column] = filled[column].ffill()
+        carried.append(filled.dropna(subset=["minimum_wage_monthly_eur"]))
+
+    frame = pd.concat(carried, ignore_index=True) if carried else frame
     merged = frame.merge(national_annual[["year", "minimum_wage_january"]], on="year", how="inner")
     merged["national_minimum_wage_eur"] = merged["minimum_wage_january"]
     merged["premium"] = (
@@ -278,6 +298,28 @@ def regional_premium(regional: pd.DataFrame, national_annual: pd.DataFrame) -> p
             "legal_source",
         ]
     ].sort_values(["geography", "year"])
+
+
+def merge_supplements(
+    parsed: list[StatutoryChange], supplements: list[StatutoryChange]
+) -> list[StatutoryChange]:
+    """Add retrieved acts to the parsed history, skipping any already present.
+
+    The summary page may start listing an act that is registered here. Appending
+    unconditionally would then put two rows on one date for one regime, which
+    makes the reconciliation check report a spurious zero-per-cent increase.
+
+    Args:
+        parsed: Changes read from the summary history.
+        supplements: Changes read from the gazette.
+
+    Returns:
+        The union, preferring the parsed history where both cover a regime-date.
+    """
+    present = {(change.scope, change.effective_date) for change in parsed}
+    return parsed + [
+        change for change in supplements if (change.scope, change.effective_date) not in present
+    ]
 
 
 def supplementary_statutory_changes(
@@ -311,7 +353,13 @@ def supplementary_statutory_changes(
             else:
                 # An act may fix several regimes in one article. The index
                 # selects which stated amount this entry refers to.
-                stated = parse_amounts(act.text[act.text.lower().rfind("passam a ser de") :])
+                anchor = act.text.lower().rfind("passam a ser de")
+                if anchor < 0:
+                    raise ValueError(
+                        "no 'passam a ser de' clause found; amount_index cannot "
+                        "select among the amounts this act states"
+                    )
+                stated = parse_amounts(act.text[anchor:])
                 if len(stated) <= index:
                     raise ValueError(f"act states {len(stated)} amounts, index {index} requested")
                 amount, currency = stated[index]
