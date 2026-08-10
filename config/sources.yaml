@@ -80,6 +80,24 @@ sources:
     verified_on: 2026-08-09
     minimum_bytes: 2000
 
+  ine_regional_cpi:
+    provider: INE (Statistics Portugal)
+    kind: json
+    url: "https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp?varcd=0014659&lang=PT"
+    destination: "data/raw/ine/regional_cpi_metadata.json"
+    description: >-
+      Metadata for indicator 0014659, the consumer price index (base 2025) by
+      NUTS II region and consumption purpose, monthly from January 1991. This is
+      the only published source for regional prices at consumption-purpose
+      detail; Eurostat's HICP for Portugal is national only. The observations
+      themselves are retrieved by 'ptmw data ine-cpi', which pages the API.
+      Indicator codes are retired without redirect when a series is rebased, so
+      the live code is confirmed against the dados.gov.pt catalogue rather than
+      hard-coded from an old reference.
+    licence: "INE open data; attribution required."
+    verified_on: 2026-08-10
+    minimum_bytes: 1000
+
   gep_rmmg_report_10:
     provider: GEP/MTSSS (via Internet Archive)
     kind: pdf

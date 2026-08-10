@@ -17,6 +17,7 @@ from pt_mw_inflation.data.ameco import to_frame as ameco_to_frame
 from pt_mw_inflation.data.dgert import parse_minimum_wage_history
 from pt_mw_inflation.data.eurostat import fetch_minimum_wage as fetch_eurostat_minimum_wage
 from pt_mw_inflation.data.eurostat import fetch_portugal_hicp, save_frame
+from pt_mw_inflation.data.ine import fetch_regional_cpi
 from pt_mw_inflation.data.registry import download_registry
 from pt_mw_inflation.data.worldbank import fetch_indicator
 from pt_mw_inflation.processing.macro import (
@@ -71,6 +72,30 @@ def eurostat_hicp(
     frame = fetch_portugal_hicp(geo=geo)
     save_frame(frame, root / output)
     typer.echo(f"Saved {len(frame):,} observations to {output}")
+
+
+@data_app.command("ine-cpi")
+def data_ine_cpi(
+    start: str = typer.Option("1991-01", help="First month, as YYYY-MM."),
+    end: str = typer.Option("", help="Last month, as YYYY-MM. Defaults to last complete month."),
+    output: Path = typer.Option(
+        Path("data/processed/regional_price_panel.parquet"), help="Output Parquet path."
+    ),
+) -> None:
+    """Download the regional consumer price panel from Statistics Portugal."""
+    root = _repo_root()
+    frame = fetch_regional_cpi(start=start, end=end or None)
+
+    destination = root / output
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_parquet(destination, index=False)
+
+    regions = frame.loc[~frame["is_aggregate"], "nuts_code"].nunique()
+    typer.echo(f"Wrote {len(frame):,} observations to {output}")
+    typer.echo(
+        f"  {regions} NUTS II regions, {frame['category_code'].nunique()} consumption "
+        f"categories, {frame['month'].min():%Y-%m} to {frame['month'].max():%Y-%m}"
+    )
 
 
 @build_app.command("minimum-wage")

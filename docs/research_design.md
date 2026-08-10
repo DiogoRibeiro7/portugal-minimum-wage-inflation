@@ -224,10 +224,20 @@ regions, so a national industry bite is far less damaging: identification can
 come from regions facing genuinely different statutory changes at the same
 moment, rather than only from cross-industry differences in a common shock.
 
-Two things are still required before pass-through can be estimated. Regional
-consumer prices by NUTS II and consumption purpose, which the price panel needs
-and which is not yet acquired; and an honest treatment of the fact that the two
-autonomous regions are small, remote and tourism-intensive, so they are not a
-clean control for the mainland. With two treated regions, few-cluster inference
-is not a refinement but the whole problem, and the procedures in
-`analysis/inference.py` are the minimum standard rather than a robustness check.
+Regional prices are now acquired. Statistics Portugal indicator `0014659`
+publishes the consumer price index by NUTS II region and consumption purpose,
+monthly from 1991, and the panel is built for 2000 onwards: nine regions,
+fourteen consumption purposes. Both regions with their own statutory wage have
+a complete monthly series, so prices and policy align on the same geographies.
+
+What remains is not a data gap but a design constraint, and it should not be
+described as though acquiring more data would resolve it. The two autonomous
+regions are small, remote and tourism-intensive, so they are not a clean
+control for the mainland: any estimate comparing them to it is exposed to
+tourism cycles, transport costs and island-specific supply shocks that move
+prices for reasons unrelated to wage policy. With two treated regions,
+few-cluster inference is not a refinement but the whole problem, and the
+procedures in `analysis/inference.py` are the minimum standard rather than a
+robustness check. The falsification battery — pre-trends, placebo dating,
+leave-one-region-out — carries correspondingly more weight than it would in a
+design with many clusters.
