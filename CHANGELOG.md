@@ -86,6 +86,14 @@ was.
 - Regional statutory minimum wages for Madeira and the Azores, built from the
   acts themselves, together with the premium over the national wage.
 - `config/legal_acts.yaml`, the register of acts retrieved as primary sources.
+- Regional employment by NUTS II region and NACE activity from Eurostat's
+  regional accounts, and the shift-share exposure it makes possible. Frozen on
+  2015 composition, exposure ranges from 18.4 per cent in Norte to 20.5 in the
+  Algarve, with nine distinct regional values.
+- The national minimum-wage bite by economic activity, registered in
+  `config/minimum_wage_bite.yaml` from the GEP monitoring report, keyed by
+  activity name because the published table's letters and names are misaligned
+  in its text layer.
 - Regional consumer price panel from Statistics Portugal indicator `0014659`:
   price indices by NUTS II region and consumption purpose, monthly, built for
   2000 onwards by `ptmw data ine-cpi`. This is the last data dependency of the
