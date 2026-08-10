@@ -119,6 +119,11 @@ was.
 
 ### Fixed
 
+- The manuscript bibliography. Nothing in the paper cited anything, and the
+  build ran a single LaTeX pass with no bibtex step, so the reference list was
+  empty and the build still exited zero. `make paper` now runs the full cycle
+  and fails on unresolved citations, and the test suite checks citation keys
+  and entry completeness independently of the build.
 - The registered GEP bulletin link is withdrawn upstream: the host now answers
   200 with an HTML landing page for every path. It is disabled with a recorded
   reason instead of silently storing that page as a spreadsheet.

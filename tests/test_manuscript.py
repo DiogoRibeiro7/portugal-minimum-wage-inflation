@@ -30,6 +30,8 @@ _STRUCTURAL = re.compile(
 
 _MACRO_USE = re.compile(r"\\([A-Za-z]+)\{?\}?")
 _MACRO_DEF = re.compile(r"\\(?:new|provide)command\{\\([A-Za-z]+)\}")
+_BIB_ENTRY = re.compile(r"@\w+\{([^,]+),")
+_CITE = re.compile(r"\\cite[a-z]*\{([^}]+)\}")
 
 
 def _generated_macros() -> set[str]:
@@ -120,3 +122,44 @@ def test_generated_tables_carry_a_do_not_edit_banner() -> None:
 
     for path in generated:
         assert "Do not edit" in path.read_text(encoding="utf-8"), path.name
+
+
+def test_every_citation_key_exists_in_the_bibliography() -> None:
+    """A cited key with no entry silently drops from the reference list.
+
+    LaTeX reports this as a warning, not an error, so a single-pass build
+    produces a paper with an empty bibliography and exit code zero. That is how
+    the references went missing here, so the check is made independently of the
+    build.
+    """
+    bibliography = REPORT / "references.bib"
+    if not bibliography.exists():
+        pytest.skip("no bibliography present")
+
+    defined = set(_BIB_ENTRY.findall(bibliography.read_text(encoding="utf-8")))
+    cited: set[str] = set()
+    for text in _section_text().values():
+        for group in _CITE.findall(text):
+            cited |= {key.strip() for key in group.split(",")}
+
+    assert cited, "no section cites anything; the reference list would be empty"
+    assert not cited - defined, f"cited but absent from the bibliography: {sorted(cited - defined)}"
+
+
+def test_bibliography_entries_are_complete() -> None:
+    """An entry missing title, author or year renders as a stub."""
+    bibliography = REPORT / "references.bib"
+    if not bibliography.exists():
+        pytest.skip("no bibliography present")
+
+    text = bibliography.read_text(encoding="utf-8")
+    incomplete = []
+    for block in re.split(r"(?=@)", text):
+        match = _BIB_ENTRY.match(block.strip())
+        if match is None:
+            continue
+        for field in ("title", "author", "year"):
+            if re.search(field + r"\s*=", block) is None:
+                incomplete.append(f"{match.group(1)}:{field}")
+
+    assert not incomplete, f"incomplete bibliography entries: {incomplete}"

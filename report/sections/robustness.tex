@@ -33,7 +33,9 @@ observed changes.
 \subsection{Why conventional inference cannot be trusted here}
 
 Cluster-robust standard errors are justified asymptotically in the number of
-clusters, and Portugal has few regions. In simulation with seven clusters and a
+clusters, and Portugal has few regions. That conventional inference over-rejects
+in this situation, and that a wild cluster bootstrap corrects it, is established
+\citep{cameron2008bootstrap}. In simulation with seven clusters and a
 true null, the conventional test rejects at the five per cent level about twenty
 per cent of the time, while a restricted wild cluster bootstrap holds its size.
 With so few clusters the bootstrap can enumerate the entire space of sign
@@ -70,7 +72,9 @@ detecting exactly that.
 If regional variation is unavailable, the remaining variation is across
 consumption categories facing a common national change. Rather than impose an
 exposure measure -- which would require minimum-wage coverage by region and
-industry jointly, and no Portuguese source publishes it -- the differential
+industry jointly, and no Portuguese source publishes it, and whose shift-share
+construction carries assumptions of its own \citep{goldsmithpinkham2020bartik}
+-- the differential
 response can be estimated directly, one coefficient per category.
 
 That design cannot carry calendar-time fixed effects, because a national shock

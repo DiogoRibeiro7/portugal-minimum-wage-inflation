@@ -44,7 +44,14 @@ paper:
 	poetry run ptmw build minimum-wage
 	poetry run ptmw build macro
 	poetry run ptmw analyse macro
+	# LaTeX resolves citations and cross-references across passes, and bibtex
+	# runs between them. A single pass leaves the bibliography empty and every
+	# citation unresolved, which is how the references silently went missing.
 	cd report && pdflatex -interaction=nonstopmode -halt-on-error main.tex
+	cd report && bibtex main
+	cd report && pdflatex -interaction=nonstopmode -halt-on-error main.tex
+	cd report && pdflatex -interaction=nonstopmode -halt-on-error main.tex
+	@cd report && ! grep -qE "Citation .* undefined|undefined references" main.log 		|| (echo "ERROR: unresolved citations remain" && exit 1)
 
 clean:
 	rm -rf .pytest_cache .mypy_cache .ruff_cache htmlcov .coverage coverage.xml dist build
