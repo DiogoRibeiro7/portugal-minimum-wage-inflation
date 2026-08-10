@@ -30,7 +30,7 @@ dependencies = [
     "requests>=2.32,<3.0",
     "pyyaml>=6.0,<7.0",
     "pydantic>=2.11,<3.0",
-    "typer[all]>=0.16,<1.0",
+    "typer[all]>=0.27.1,<1.0",
     "openpyxl>=3.1,<4.0",
     "lxml>=6.1,<7.0",
     "beautifulsoup4>=4.13,<5.0",
@@ -57,13 +57,13 @@ packages = [{ include = "pt_mw_inflation", from = "src" }]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.3"
-pytest-cov = "^6.2"
-mypy = "^1.16"
-ruff = "^0.12"
+pytest-cov = "^7.1"
+mypy = "^2.3"
+ruff = "^0.16"
 pre-commit = "^4.2"
 types-requests = "^2.32"
 types-PyYAML = "^6.0"
-pandas-stubs = "^2.3"
+pandas-stubs = "^3.0"
 
 [tool.ruff]
 line-length = 100
