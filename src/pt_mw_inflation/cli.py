@@ -22,13 +22,11 @@ from pt_mw_inflation.data.dgert import parse_minimum_wage_history
 from pt_mw_inflation.data.eurostat import fetch_minimum_wage as fetch_eurostat_minimum_wage
 from pt_mw_inflation.data.eurostat import fetch_portugal_hicp, save_frame
 from pt_mw_inflation.data.eurostat_regional import (
-    EMPLOYEES,
-    REGIONAL_EMPLOYEES,
-    REGIONAL_TOTAL_EMPLOYMENT,
-    TOTAL_EMPLOYMENT,
+    RegionalEmploymentError,
     fetch_national_employment,
     fetch_regional_employment,
     industry_shares,
+    require_matched_inputs,
 )
 from pt_mw_inflation.data.ine import fetch_regional_cpi
 from pt_mw_inflation.data.registry import download_registry
@@ -196,38 +194,12 @@ def build_regional_exposure(
     # two together, so changing one option produced a measure labelled as frozen
     # at a year only half of it was frozen at. The download now stamps its year
     # and this refuses the mismatch.
-    stamped = "reference_year" in national_employment.columns
-    if stamped:
-        weight_years = sorted({int(year) for year in national_employment["reference_year"]})
-        if weight_years != [baseline_year]:
-            raise typer.BadParameter(
-                f"national weights are for {weight_years} but composition is frozen at "
-                f"{baseline_year}; re-run 'ptmw data regional-employment --year {baseline_year}'"
-            )
-
-    # The two frames use different vocabularies for the same populations, so
-    # they are compared through the pairing rather than by equality. Composition
-    # counting the self-employed against a bite weighted on employees alone
-    # would put the coverage figures on a denominator the weights do not share.
-    populations = {
-        "regional": set(regional_employment.get("population", pd.Series(dtype=str))),
-        "national": set(national_employment.get("population", pd.Series(dtype=str))),
-    }
-    if all(populations.values()):
-        matched = {(REGIONAL_EMPLOYEES, EMPLOYEES), (REGIONAL_TOTAL_EMPLOYMENT, TOTAL_EMPLOYMENT)}
-        pairing = (next(iter(populations["regional"])), next(iter(populations["national"])))
-        if len(populations["regional"]) > 1 or len(populations["national"]) > 1:
-            raise typer.BadParameter(f"employment frames mix populations: {populations}")
-        if pairing not in matched:
-            raise typer.BadParameter(
-                f"composition counts {pairing[0]} but the weights count {pairing[1]}; "
-                "re-run 'ptmw data regional-employment' so both count the same people"
-            )
-    elif not stamped:
-        typer.echo(
-            "  warning: employment carries no reference year or population; "
-            "re-run 'ptmw data regional-employment' to stamp it"
+    try:
+        population, _ = require_matched_inputs(
+            regional_employment, national_employment, baseline_year=baseline_year
         )
+    except RegionalEmploymentError as error:
+        raise typer.BadParameter(str(error)) from error
 
     shares = industry_shares(regional_employment, year=baseline_year)
     bite = activity_bite_from_registry(registry, national_employment)
@@ -238,6 +210,7 @@ def build_regional_exposure(
     exposure.to_parquet(destination, index=False)
 
     typer.echo(f"Wrote exposure for {len(exposure)} regions to {output}")
+    typer.echo(f"  composition and weights both count {population}, frozen at {baseline_year}")
     covered = exposure["covered_employment_share"]
     typer.echo(f"  bite measured on {covered.min():.0%}-{covered.max():.0%} of regional employment")
 

@@ -15,6 +15,7 @@ from pt_mw_inflation.data.eurostat_regional import (
     NACE_PARTITION,
     RegionalEmploymentError,
     industry_shares,
+    require_matched_inputs,
 )
 from pt_mw_inflation.processing.exposure import (
     ExposureError,
@@ -316,3 +317,62 @@ def test_omitting_employment_entirely_still_weights_sections_equally() -> None:
     """
     unweighted = activity_bite_from_registry(REGISTRY).set_index("industry")
     assert unweighted.loc["B-E", "minimum_wage_bite"] == pytest.approx((0.006 + 0.24) / 2)
+
+
+def _stamped(population: str, year: int = 2015) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """A regional and national frame carrying matching provenance stamps."""
+    regional = _employment()
+    regional["population"] = "SAL" if population == "employees" else "EMP"
+    national = NATIONAL_EMPLOYMENT.copy()
+    national["population"] = "SAL_DC" if population == "employees" else "EMP_DC"
+    national["reference_year"] = year
+    return regional, national
+
+
+def test_matched_inputs_accept_either_population_consistently_used() -> None:
+    """Both bases are admissible; mixing them is what is not."""
+    for population, expected in (("employees", ("SAL", "SAL_DC")), ("all", ("EMP", "EMP_DC"))):
+        regional, national = _stamped(population)
+        assert require_matched_inputs(regional, national, baseline_year=2015) == expected
+
+
+def test_mixed_populations_are_refused() -> None:
+    """Employee weights against all-worker composition put coverage on the wrong base.
+
+    The coverage figure is then a fraction of employees reported against a
+    denominator of all workers, which is wrong by however much self-employment
+    differs between the measured and unmeasured sections.
+    """
+    regional, _ = _stamped("all")
+    _, national = _stamped("employees")
+    with pytest.raises(RegionalEmploymentError, match="counts EMP but the weights count SAL_DC"):
+        require_matched_inputs(regional, national, baseline_year=2015)
+
+
+def test_weights_frozen_at_another_year_are_refused() -> None:
+    """Half of a measure frozen at 2015 is not a measure frozen at 2015."""
+    regional, national = _stamped("employees", year=2019)
+    with pytest.raises(RegionalEmploymentError, match=r"weights are for \[2019\]"):
+        require_matched_inputs(regional, national, baseline_year=2015)
+
+
+@pytest.mark.parametrize("dropped", ["population", "reference_year"])
+def test_an_unstamped_frame_is_refused_not_warned(dropped: str) -> None:
+    """A missing stamp must fail, whatever the other frame carries.
+
+    Conditioning the population check on the year stamp let a half-stamped pair
+    through: a national file with its year but no population, beside a regional
+    file with neither, satisfied the year check and skipped the denominator
+    check entirely.
+    """
+    regional, national = _stamped("employees")
+    with pytest.raises(RegionalEmploymentError, match="predate the provenance stamps"):
+        require_matched_inputs(regional, national.drop(columns=[dropped]), baseline_year=2015)
+
+
+def test_a_frame_mixing_populations_within_itself_is_refused() -> None:
+    """One file carrying two populations cannot be assigned a single denominator."""
+    regional, national = _stamped("employees")
+    regional.loc[regional.index[0], "population"] = "EMP"
+    with pytest.raises(RegionalEmploymentError, match="mix populations"):
+        require_matched_inputs(regional, national, baseline_year=2015)

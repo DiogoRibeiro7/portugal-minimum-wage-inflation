@@ -154,6 +154,76 @@ def fetch_regional_employment(
     return result.reset_index(drop=True)
 
 
+#: The population codes that name the same people in the two datasets. The
+#: regional and national accounts use different vocabularies, so a pairing is
+#: checked against this rather than the two codes compared for equality.
+MATCHED_POPULATIONS = frozenset(
+    {(REGIONAL_EMPLOYEES, "SAL_DC"), (REGIONAL_TOTAL_EMPLOYMENT, "EMP_DC")}
+)
+
+
+def require_matched_inputs(
+    regional: pd.DataFrame, national: pd.DataFrame, *, baseline_year: int
+) -> tuple[str, str]:
+    """Check that composition and weights describe the same people in the same year.
+
+    Composition is frozen at ``baseline_year``; the weights were frozen at
+    whatever year was passed to the download. Nothing tied the two together, so
+    changing one produced a measure labelled as frozen at a year only half of it
+    was frozen at. The populations are the same trap one level down: composition
+    counting the self-employed against a bite weighted on employees alone puts
+    the coverage figures on a denominator the weights do not share.
+
+    An unstamped frame is refused rather than warned about. Both files are one
+    command away from being regenerated, so there is no case for proceeding on a
+    pairing that cannot be verified.
+
+    Args:
+        regional: Regional employment, as downloaded.
+        national: National employment by NACE section, as downloaded.
+        baseline_year: Year the composition is frozen at.
+
+    Returns:
+        The matched ``(regional, national)`` population codes.
+
+    Raises:
+        RegionalEmploymentError: If either frame lacks its provenance stamps,
+            mixes populations, was frozen at another year, or counts a different
+            population from the other.
+    """
+    unstamped = [
+        name
+        for name, frame in (("regional", regional), ("national", national))
+        if "population" not in frame.columns
+    ]
+    if "reference_year" not in national.columns:
+        unstamped.append("national")
+    if unstamped:
+        raise RegionalEmploymentError(
+            f"employment frames {sorted(set(unstamped))} predate the provenance stamps; "
+            "re-run 'ptmw data regional-employment' so the year and population can be checked"
+        )
+
+    weight_years = sorted({int(year) for year in national["reference_year"]})
+    if weight_years != [baseline_year]:
+        raise RegionalEmploymentError(
+            f"national weights are for {weight_years} but composition is frozen at "
+            f"{baseline_year}; re-run 'ptmw data regional-employment --year {baseline_year}'"
+        )
+
+    populations = {"regional": set(regional["population"]), "national": set(national["population"])}
+    if any(len(values) != 1 for values in populations.values()):
+        raise RegionalEmploymentError(f"employment frames mix populations: {populations}")
+
+    pairing = (next(iter(populations["regional"])), next(iter(populations["national"])))
+    if pairing not in MATCHED_POPULATIONS:
+        raise RegionalEmploymentError(
+            f"composition counts {pairing[0]} but the weights count {pairing[1]}; "
+            "re-run 'ptmw data regional-employment' so both count the same people"
+        )
+    return pairing
+
+
 def industry_shares(
     employment: pd.DataFrame,
     *,
