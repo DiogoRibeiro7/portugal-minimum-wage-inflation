@@ -101,7 +101,9 @@ was.
 - `poetry.lock` is now committed, so a rerun resolves to the same dependency
   versions.
 - Dependency floors raised past known advisories: `lxml` to 6.1, `pyarrow` to
-  23.0.1, `pytest` to 9.0.3.
+  23.0.1, `pytest` to 9.0.3, `cryptography` to 49.0. The last is required by
+  pypdf to read the AES-encrypted PDFs the gazette publishes, and the initial
+  constraint capped it below the patched release.
 - Source registry records licence terms and a verification date per source.
 - Provenance manifest uses forward-slash paths, so it is byte-identical across
   platforms for identical downloads.
