@@ -63,11 +63,11 @@ bite_by_activity:
 # Two differences between the populations remain and are not corrected. The
 # survey covers full-time employees while the weights count employees at any
 # hours, and the survey's reference month is October while the weights are an
-# annual average. Both are approximations. Weighting on total employment instead
-# moves the regional exposure spread by 0.04 percentage points and every group
-# bite by less than half a point, so neither is capable of changing the
-# conclusion the measure supports, which is that its spread is too small to
-# identify anything.
+# annual average. Both are approximations. Counting all workers instead of
+# employees on both sides moves the regional exposure spread by 0.11 percentage
+# points and no group's bite by more than 0.4, so neither approximation is
+# capable of changing the conclusion the measure supports, which is that its
+# spread is too small to identify anything.
 #
 # `sections` lists the NACE sections a group contains -- all of them, including
 # those the survey does not cover. That completeness is the point. Listing only

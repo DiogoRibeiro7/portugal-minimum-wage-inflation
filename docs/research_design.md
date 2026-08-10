@@ -22,6 +22,12 @@ reader than a weakly identified estimate.
 > Regenerate them with `ptmw build regional-exposure` and `ptmw analyse
 > pass-through`, and read `report/tables/exposure_macros.tex` and
 > `report/tables/identification_macros.tex` for the current values.
+>
+> The per-group figures below --- each group's bite, and how much of its
+> employment the survey covered --- have no macro behind them, because the paper
+> does not quote them. Reproduce those from
+> `activity_bite_from_registry(registry, national_employment)` rather than
+> looking for a generated file that does not exist.
 
 The document is layered: it records positions in the order they were reached,
 including one that was later shown to be wrong, because how it was reached is
@@ -34,9 +40,9 @@ that conflicts with it.
   is constructible and is constructed. The section *The region-by-industry
   exposure measure, revisited* corrects the earlier claim to the contrary, and
   the earlier claim is left in place, marked, rather than edited out.
-- The exposure design **is** blocked by two other things. The measure spans 1.87
+- The exposure design **is** blocked by two other things. The measure spans 1.94
   percentage points across nine regions with a coefficient of variation of
-  0.026, which identifies a regional effect in principle and nothing in
+  0.027, which identifies a regional effect in principle and nothing in
   practice; and the published bite post-dates the 2015 policy restart, so it is
   not predetermined for the episode with the most policy variation.
 - Regional *policy* variation exists but is thin: three identifying
@@ -89,7 +95,7 @@ the availability of data, and every part of it is measured rather than asserted:
   region contributes no independent timing;
 - Madeira is the only source of genuine divergence;
 - the shift-share exposure measure that would substitute for policy variation is
-  built and reported, and spans 1.87 percentage points across nine regions,
+  built and reported, and spans 1.94 percentage points across nine regions,
   which is too flat to identify a price response; the constraint is that the
   Portuguese wage floor binds at broadly similar rates across industries, so
   industry mix carries little information about exposure to it;
@@ -251,11 +257,11 @@ So the design is constrained by an assumption, not blocked by missing data.
 Those are different positions and the earlier document asserted the wrong one.
 
 **What the measure delivers.** Frozen on 2015 composition, exposure ranges from
-19.9 per cent in Grande Lisboa to 21.7 per cent in the Norte, with every one of
+19.7 per cent in Grande Lisboa to 21.7 per cent in the Norte, with every one of
 the nine regions taking a distinct value. The composition behind it varies
-sharply: the Algarve has 38.8 per cent of employment in trade, transport,
-accommodation and food service against the Alentejo's 20.5, while the Alentejo
-has 22.0 per cent in agriculture against Grande Lisboa's 0.7.
+sharply: the Algarve has 41.8 per cent of employees in trade, transport,
+accommodation and food service against the Alentejo's 21.6, while the Alentejo
+has 13.4 per cent in agriculture against Grande Lisboa's 0.5.
 
 **The aggregation must be employment-weighted, and it was not.** The regional
 accounts publish coarser activity groups than the survey measures the bite at,
@@ -275,7 +281,7 @@ absent, but public administration shares a group with education and health, so
 assigning the surveyed sections' bite to the whole group imputes a minimum wage
 to workers nobody surveyed and reports the group as fully covered. Measuring it
 properly, that group is 68.6 per cent covered and arts-and-other-services 47.8
-per cent, which takes regional coverage down to a 66.6 to 88.4 per cent range
+per cent, which takes regional coverage down to a 73.4 to 89.4 per cent range
 from the 78 to 99 previously reported.
 
 **Predetermination is enforced, not assumed.** The published bite is dated
@@ -287,7 +293,7 @@ is correct: estimating that episode needs an earlier GEP snapshot, not a
 different argument.
 
 **Whether the variation is strong enough is a separate question.** The spread is
-1.87 percentage points and the coefficient of variation 0.026. Nine distinct
+1.94 percentage points and the coefficient of variation 0.027. Nine distinct
 values establish that a regional effect is identified in principle;
 they do not establish that it is identified precisely enough to be informative,
 and `require_regional_variation` answers only the first question.

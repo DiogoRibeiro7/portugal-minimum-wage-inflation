@@ -80,21 +80,42 @@ def _decode(payload: dict[str, Any]) -> pd.DataFrame:
     return pd.DataFrame.from_records(records)
 
 
+#: Employees, in the regional accounts' vocabulary. The counterpart of
+#: :data:`EMPLOYEES` below, which names the same population in the national
+#: accounts under a different code.
+REGIONAL_EMPLOYEES = "SAL"
+
+#: All persons in employment, employees and self-employed together.
+REGIONAL_TOTAL_EMPLOYMENT = "EMP"
+
+
 def fetch_regional_employment(
     *,
     regions: tuple[str, ...] = PORTUGUESE_REGIONS,
     dataset: str = REGIONAL_EMPLOYMENT_DATASET,
+    wstatus: str = REGIONAL_EMPLOYEES,
     timeout_seconds: int = 180,
 ) -> pd.DataFrame:
     """Fetch employment by region and activity.
 
+    Counts employees by default. The exposure measure multiplies a region's
+    industry composition by the share of employees in that industry paid the
+    minimum wage, so composition and bite have to be shares of the same
+    population. Counting the self-employed in the composition and not in the
+    bite would make a region's exposure depend on how much self-employment its
+    industries happen to carry, which is not what the measure is about, and
+    would put the coverage figures on a different denominator from the weights.
+
     Args:
         regions: NUTS codes to request.
         dataset: Eurostat dataset code.
+        wstatus: Population to count.
         timeout_seconds: Request timeout.
 
     Returns:
-        Columns `region`, `activity`, `year` and `employment_thousands`.
+        Columns `region`, `activity`, `year`, `employment_thousands` and
+        `population`, the last so a later stage can refuse to combine
+        populations that do not match.
 
     Raises:
         requests.HTTPError: If the request fails.
@@ -103,7 +124,7 @@ def fetch_regional_employment(
     params: list[tuple[str, str]] = [
         ("format", "JSON"),
         ("lang", "EN"),
-        ("wstatus", "EMP"),
+        ("wstatus", wstatus),
         ("unit", "THS"),
     ]
     params.extend(("geo", region) for region in regions)
@@ -117,7 +138,7 @@ def fetch_regional_employment(
     response.raise_for_status()
     frame = _decode(json.loads(response.content))
 
-    return (
+    result = (
         frame.rename(
             columns={
                 "geo": "region",
@@ -128,8 +149,9 @@ def fetch_regional_employment(
         )[["region", "activity", "year", "employment_thousands"]]
         .astype({"year": int})
         .sort_values(["region", "activity", "year"])
-        .reset_index(drop=True)
     )
+    result["population"] = wstatus
+    return result.reset_index(drop=True)
 
 
 def industry_shares(
