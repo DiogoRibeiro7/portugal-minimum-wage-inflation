@@ -76,7 +76,7 @@ the correlation between the residual and subsequent inflation cannot settle the
 question, because statutory changes respond to the same conditions that drive
 prices.
 
-## Minimum publication standard
+## Minimum publication standard, as revised
 
 The original standard required pre-trend diagnostics, small-cluster inference,
 predetermined exposure and robustness to alternative exposure definitions before

@@ -18,9 +18,9 @@ The Azores contribute one month. Their supplement is proportional, so
 $\Delta \log MW$ in the Azores equals $\Delta \log MW$ on the mainland exactly
 in every month after the supplement took effect; the region adds rows to the
 panel and not one degree of freedom. Madeira contributes one month per act.
-Across the full monthly panel from 2000, and after excluding the years for which
-Madeira legislated but the act is not yet in our register, five region-months
-diverge -- four of them Madeira's.
+Over the estimation window, and after excluding the years for which Madeira
+legislated but the act is not yet in our register, \IdentifyingEvents{}
+region-months diverge, across \IdentifyingRegions{} region.
 
 We stress the direction of this problem. A gap in the register is not neutral:
 if a region legislated in a year whose act is missing, its wage appears frozen
@@ -48,27 +48,22 @@ and Table~\ref{tab:regional-design} shows it on the actual data.
   Estimated over the window in which Madeira's register is contiguous, with
   region-category and calendar-time fixed effects, clustered on region.}
   \label{tab:regional-design}
-  \begin{tabular}{lrrr}
-    \toprule
-    Horizon (months) & Coefficient & Clustered $p$ & Bootstrap $p$ \\
-    \midrule
-    0  & 0.343 & 0.000 & 0.248 \\
-    1  & 0.738 & 0.000 & 0.099 \\
-    3  & 0.561 & 0.000 & 0.154 \\
-    6  & 0.369 & 0.000 & 0.353 \\
-    12 & 0.174 & 0.081 & 0.407 \\
-    \bottomrule
-  \end{tabular}
+  \input{tables/regional_design}
 \end{table}
 
-Conventional inference calls four of the five horizons significant at the
-one-tenth of one per cent level. The bootstrap rejects none of them at five per
-cent. Had we reported only the third column, the paper would have claimed
-near-complete pass-through of minimum-wage costs into consumer prices within a
-month of implementation. The coefficient of 0.74 at one month is on its face
-implausible, which is the second reason to distrust it: an estimate identified
-by four events in one small, remote, tourism-intensive region is picking up
-whatever else was happening in Madeira.
+Conventional inference calls \ClusteredHighlySignificant{} of the
+\HorizonsEstimated{} horizons significant at the one-tenth of one per cent
+level. The bootstrap rejects none of them at five per cent: its smallest
+$p$-value is \MinBootstrapP{}. Had we reported only the third column, the paper
+would have claimed substantial pass-through of minimum-wage costs into consumer
+prices within months of implementation.
+
+The magnitudes are the second reason to distrust them. The largest coefficient
+is \PeakCoefficient{} at \PeakHorizon{}~months, which would imply prices rising
+by more than the wage shock itself. An estimate identified by
+\IdentifyingEvents{} events in one small, remote, tourism-intensive region is
+picking up whatever else was happening in Madeira, and the bootstrap is
+detecting exactly that.
 
 \subsection{The alternative design, and why it also falls short}
 

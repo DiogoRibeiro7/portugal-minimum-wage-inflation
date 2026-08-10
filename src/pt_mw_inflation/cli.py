@@ -9,9 +9,12 @@ import pandas as pd
 import typer
 import yaml
 
-from pt_mw_inflation.analysis.falsification import run_pre_trend_diagnostic
 from pt_mw_inflation.analysis.local_projections import estimate_panel_local_projections
-from pt_mw_inflation.analysis.outputs import generate_macro_outputs
+from pt_mw_inflation.analysis.outputs import (
+    generate_macro_outputs,
+    write_identification_macros,
+    write_regional_design_table,
+)
 from pt_mw_inflation.data.ameco import fetch_series as fetch_ameco_series
 from pt_mw_inflation.data.ameco import to_frame as ameco_to_frame
 from pt_mw_inflation.data.dgert import parse_minimum_wage_history
@@ -30,6 +33,11 @@ from pt_mw_inflation.processing.minimum_wage import (
     build_statutory_panel,
     find_unexplained_jumps,
     reconcile_annual_with_eurostat,
+)
+from pt_mw_inflation.processing.pass_through import (
+    build_estimation_panel,
+    build_regional_shock,
+    count_identifying_events,
 )
 from pt_mw_inflation.processing.regional import (
     build_regional_panel,
@@ -264,46 +272,86 @@ def analyse_macro(
 
 @analyse_app.command("pass-through")
 def analyse_pass_through(
-    panel: Path = typer.Option(
-        Path("data/processed/exposure_price_panel.parquet"),
-        help="Region-category-month panel with log prices and the exposure shock.",
+    prices: Path = typer.Option(
+        Path("data/processed/regional_price_panel.parquet"),
+        help="Regional price panel from 'ptmw data ine-cpi'.",
     ),
-    output: Path = typer.Option(
-        Path("report/tables/pass_through.csv"), help="Where to write the estimates."
+    wages: Path = typer.Option(
+        Path("data/processed/minimum_wage_policy.parquet"),
+        help="Statutory panel from 'ptmw build minimum-wage'.",
+    ),
+    start: str = typer.Option(
+        "2023-01", help="First month; the window where the register is contiguous."
     ),
 ) -> None:
-    """Estimate the dynamic pass-through function with few-cluster inference.
+    """Estimate the regional pass-through design and write its outputs.
 
-    Runs the horizons configured in config/analysis.yaml, then the pre-trend
-    diagnostic and the leave-one-region-out check. Nothing is interpreted here:
-    the command reports the estimates and whether the falsification checks pass.
+    Reports the estimates, the number of region-months that actually identify
+    them, and both p-values. Nothing is interpreted here: the command produces
+    the table the manuscript imports, so no result reaches the paper by hand.
     """
     root = _repo_root()
-    source = root / panel
-    if not source.exists():
-        raise typer.BadParameter(
-            f"{panel} not found. The exposure panel depends on the regional coverage "
-            "tables, whose source is recorded as unavailable in config/sources.yaml."
-        )
+    for path in (prices, wages):
+        if not (root / path).exists():
+            raise typer.BadParameter(f"{path} not found; build it first")
 
-    settings = yaml.safe_load((root / "config/analysis.yaml").read_text(encoding="utf-8"))
+    settings = _load_settings(root)
     horizons = list(settings["pass_through"]["horizons_months"])
 
-    frame = pd.read_parquet(source)
-    estimates = estimate_panel_local_projections(
-        frame, outcome="log_price", shock="exposure_shock", horizons=horizons
+    registry = yaml.safe_load((root / "config/legal_acts.yaml").read_text(encoding="utf-8"))
+    gaps = {
+        block["geography"]: frozenset(block.get("gap_years", []) or [])
+        for block in registry["regional"].values()
+    }
+
+    price_panel = pd.read_parquet(root / prices)
+    wage_panel = pd.read_parquet(root / wages).query("scope == 'general'")
+
+    panel = build_estimation_panel(price_panel, wage_panel, start=start, gap_years=gaps)
+    months = pd.DatetimeIndex(sorted(panel["month"].unique()))
+    shock = build_regional_shock(
+        wage_panel, months, sorted(panel["nuts_code"].unique()), gap_years=gaps
     )
+    variation = count_identifying_events(shock, national="PT11")
 
-    destination = root / output
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    estimates.to_csv(destination, index=False)
-    typer.echo(f"Wrote {len(estimates)} horizon estimates to {output}")
+    typer.echo(
+        f"Identifying variation: {variation.region_months} region-months "
+        f"across {len(variation.regions)} region(s)"
+    )
+    if variation.region_months < 10:
+        typer.echo("  This is thin. Judge the estimates by this number, not by the row count.")
 
-    _, verdict = run_pre_trend_diagnostic(frame, outcome="log_price", shock="exposure_shock")
-    outcome_label = "passed" if verdict.passed else "FAILED"
-    typer.echo(f"Pre-trend diagnostic: {outcome_label} - {verdict.detail}")
-    if not verdict.passed:
-        typer.echo("  A causal reading is not supported while leads predict pre-treatment prices.")
+    estimates = estimate_panel_local_projections(
+        panel,
+        outcome="log_price",
+        shock="delta_log_minimum_wage",
+        horizons=horizons,
+        cluster="region",
+    )
+    if estimates.empty:
+        raise typer.BadParameter("no horizon could be estimated on this window")
+
+    tables = root / "report/tables"
+    write_regional_design_table(estimates, tables / "regional_design.tex")
+    write_identification_macros(
+        estimates,
+        variation.region_months,
+        len(variation.regions),
+        tables / "identification_macros.tex",
+    )
+    typer.echo(f"Wrote {len(estimates)} horizon estimates to report/tables/")
+
+    conventional = int((estimates["p_value_clustered"] < 0.05).sum())
+    bootstrap = int((estimates["p_value_bootstrap"] < 0.05).sum())
+    typer.echo(
+        f"  significant at 5%: {conventional} horizon(s) by clustered inference, "
+        f"{bootstrap} by the bootstrap"
+    )
+    if conventional > bootstrap:
+        typer.echo(
+            "  Cite the bootstrap. With this few clusters the clustered p-value "
+            "rejects a true null far above its nominal size."
+        )
 
 
 if __name__ == "__main__":

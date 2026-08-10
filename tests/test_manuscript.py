@@ -33,11 +33,22 @@ _MACRO_DEF = re.compile(r"\\(?:new|provide)command\{\\([A-Za-z]+)\}")
 
 
 def _generated_macros() -> set[str]:
-    """Names defined by the generated headline-macro file."""
-    path = REPORT / "tables" / "headline_macros.tex"
-    if not path.exists():
-        pytest.skip("headline macros not generated; run 'ptmw analyse macro'")
-    return set(_MACRO_DEF.findall(path.read_text(encoding="utf-8")))
+    """Names defined by any generated macro file.
+
+    Scanning the whole directory rather than one known file matters: a second
+    generator adding its own macros would otherwise make every quantity it
+    defines look undefined, and the failure would point at the prose instead of
+    at the test.
+    """
+    tables = REPORT / "tables"
+    sources = sorted(tables.glob("*macros*.tex")) if tables.exists() else []
+    if not sources:
+        pytest.skip("macros not generated; run 'ptmw analyse macro'")
+
+    defined: set[str] = set()
+    for path in sources:
+        defined |= set(_MACRO_DEF.findall(path.read_text(encoding="utf-8")))
+    return defined
 
 
 def _section_text() -> dict[str, str]:
@@ -69,9 +80,13 @@ def test_every_cited_quantity_is_generated() -> None:
     assert not unknown, f"sections cite undefined generated quantities: {unknown}"
 
 
-@pytest.mark.parametrize("section", ["results.tex"])
-def test_results_section_uses_macros_not_literals(section: str) -> None:
-    """The results prose must not hard-code the numbers it reports.
+@pytest.mark.parametrize("section", ["results.tex", "robustness.tex", "introduction.tex"])
+def test_empirical_sections_use_macros_not_literals(section: str) -> None:
+    """Empirical prose must not hard-code the numbers it reports.
+
+    Restricting this to one file is how a transcribed estimate got into the
+    identification section: the rule was enforced where results were expected
+    and not where they actually appeared.
 
     A decimal in the results text is almost always a transcribed estimate, which
     is exactly what the reproducibility rules forbid. Years and equation numbers
