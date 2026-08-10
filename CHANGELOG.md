@@ -68,6 +68,17 @@ was.
 - Reconciliation of the annual wage series against Eurostat, which fills years
   whose act is missing from the national history and records the compiler each
   observation came from.
+- `construct_regional_bite`, the shift-share aggregation of a national
+  industry-level bite to regions, for use once a genuine employment
+  cross-tabulation is available.
+- `assess_identifying_variation` and `require_regional_variation`, which measure
+  the between-region share of exposure variance and refuse a measure that
+  carries none. An exposure built from national inputs otherwise fails
+  silently: it populates, passes every range check, runs, and identifies
+  nothing.
+- A documented feasibility assessment of the region-by-industry exposure
+  measure, recording that no Portuguese source crosses a regional with an
+  industry dimension, and what would unblock it.
 
 ### Changed
 

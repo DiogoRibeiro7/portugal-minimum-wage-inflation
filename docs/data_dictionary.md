@@ -220,3 +220,23 @@ lead significant at `|t| > 1.96`.
 
 Passing the pre-trend test does not establish parallel trends; it fails to
 refute them, and an underpowered design passes trivially.
+
+## Regional exposure diagnostics
+
+`assess_identifying_variation` reports the share of an exposure measure's
+variance that lies between regions, and `require_regional_variation` raises when
+that share is zero.
+
+| Field | Meaning |
+| ----- | ------- |
+| `between_region_share` | Between-region share of total variance. |
+| `regions` | Number of distinct regions. |
+| `distinct_values_per_region` | Distinct regional means; 1 means no variation. |
+| `identifying` | Whether the measure can identify a regional effect. |
+| `detail` | Human-readable verdict. |
+
+This exists because an exposure built from national inputs fails silently. Every
+value is populated and plausible, every range check passes, and the regression
+runs — but the regressor is constant across regions and identifies nothing. See
+`docs/research_design.md` for why the available Portuguese sources are in
+exactly that position.
