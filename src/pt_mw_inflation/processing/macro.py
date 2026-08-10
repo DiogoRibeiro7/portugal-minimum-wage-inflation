@@ -110,7 +110,14 @@ def build_macro_annual(
         frame["real_minimum_wage_index"] / frame["productivity_index"] * 100.0
     )
     frame["log_minimum_wage_growth"] = np.log(frame["minimum_wage"]).diff()
-    frame["cumulative_policy_residual"] = frame["policy_residual"].fillna(0.0).cumsum()
+    # Compounded, not summed. The benchmark itself compounds productivity with
+    # prior inflation precisely because addition is wrong over long horizons at
+    # high inflation; summing the resulting residuals would reintroduce the
+    # error the benchmark avoids. The arithmetic sum is retained separately and
+    # named for what it is.
+    growth_ratio = (1.0 + frame["minimum_wage_growth"]) / (1.0 + frame["benchmark_wage_growth"])
+    frame["cumulative_policy_gap"] = growth_ratio.fillna(1.0).cumprod() - 1.0
+    frame["summed_annual_residual"] = frame["policy_residual"].fillna(0.0).cumsum()
 
     return frame
 

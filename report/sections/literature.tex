@@ -1,2 +1,53 @@
-\section{Literature}
-% Generated results and publication-ready text will be added after the empirical pipeline is validated.
+\section{Related work and contribution}
+\label{sec:literature}
+
+The empirical literature on the price pass-through of minimum wages is built
+largely on settings that supply cross-sectional variation in exposure to a wage
+change. \citet{renkin2022passthrough} use supermarket scanner data and variation
+in store-level exposure to estimate that a ten per cent increase in the minimum
+wage raises grocery prices by roughly a third of a per cent, while
+\citet{ashenfelter2022mcdonalds} find pass-through close to complete in a single,
+highly exposed sector. For Hungary, \citet{harasztosi2019whopays} estimate that
+consumers bore about three quarters of the cost of a large minimum-wage
+increase. What these designs share is the variation that makes them feasible:
+many units differing in how hard the same policy bites, or policy that moves
+differently across them.
+
+Methodologically, dynamic responses of this kind are commonly traced with local
+projections \citep{jorda2005projections}, and exposure measures are typically
+built as shift-shares whose properties are now well understood
+\citep{goldsmithpinkham2020bartik}. Where the number of clusters is small, the
+inference literature is unambiguous that conventional cluster-robust standard
+errors over-reject, and recommends the wild cluster bootstrap
+\citep{cameron2008bootstrap}. Section~\ref{sec:robustness} shows that this is not
+a marginal concern in the Portuguese case but decisive.
+
+Portugal itself has been studied mainly through employment and worker-flow
+margins rather than prices \citep{portugal2006disentangling}, in a tradition
+going back to the quasi-experimental designs of \citet{card1994minimum} and, more
+recently, to designs that track the whole lower tail of the wage distribution
+rather than an average effect \citep{cengiz2019bunching}.
+
+Our contribution is deliberately modest in method and specific in substance.
+
+First, we assemble the statutory series from primary law rather than from
+secondary compilations. This is not a formality. The published official history
+omits the act effective in 2000 while the entries for 2001 state their increase
+relative to it; three legally distinct minimum wages coexisted until 1991 and two
+until 2004, so a single pre-2005 ``Portuguese minimum wage'' is a choice that
+should be stated rather than assumed; and the two autonomous regions set their
+wages by mechanisms that differ in a way that matters for identification. Each
+value is read from the act that set it.
+
+Second, we provide the long-run accounting layer for Portugal on a consistent
+basis from 1974, which requires reaching past the Eurostat series that begin in
+the mid-1990s.
+
+Third, we document a negative identification result. We are not aware of a
+statement in the literature that the Azorean regional supplement, being
+proportional, contributes no independent variation to a log-linear design. It is
+a small point, and it removes one of the two regions a researcher would naturally
+expect to use.
+
+We make no claim to be the first to study Portuguese minimum wages, and no claim
+about causal pass-through.

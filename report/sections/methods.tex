@@ -1,2 +1,57 @@
-\section{Methods}
-% Generated results and publication-ready text will be added after the empirical pipeline is validated.
+\section{Measurement framework}
+\label{sec:methods}
+
+The paper's quantitative content is an accounting decomposition rather than an
+estimator, and we state it precisely so that the numbers in
+Section~\ref{sec:results} can be reproduced or disputed.
+
+\subsection{The benchmark and the residual}
+
+For year $t$, let $g^{MW}_t$ be the growth of the statutory minimum wage,
+$g^{A}_t$ the growth of real output per person employed, and $\pi_t$ consumer
+price inflation. Define the benchmark nominal wage growth and the policy
+residual as
+%
+\begin{equation}
+  g^{\text{benchmark}}_{t} = (1 + g^{A}_{t})(1 + \pi_{t-1}) - 1,
+  \qquad
+  r_{t} = g^{MW}_{t} - g^{\text{benchmark}}_{t}.
+  \label{eq:residual}
+\end{equation}
+%
+The benchmark answers a specific question: by how much would the wage floor have
+had to rise to keep pace with productivity while compensating for the previous
+year's inflation? The residual is the part of statutory growth that did neither.
+
+Two conventions matter. The benchmark \emph{compounds} rather than adds. At the
+inflation rates Portugal experienced in the early 1980s the additive
+approximation understates it by more than a percentage point, which exceeds most
+of the residuals being measured. And inflation enters lagged, because a wage set
+in December for the following January can respond to inflation already observed
+but not to inflation not yet realised.
+
+\subsection{Annual conventions}
+
+Acts take effect on a stated date, which is 1 January in most years but not all:
+the wage changed mid-year in 1975, 1978, 1979, 1980, 1981, 1989 and 2014. Two
+annual series are therefore constructed, one giving the level in force on
+1~January and one averaging the level over the days of the year. The results
+below use the day-weighted average, which is the convention that matches annual
+national-accounts aggregates. The two agree in every year without a mid-year
+act.
+
+\subsection{Dynamic specification}
+
+Where dynamic responses are estimated in Section~\ref{sec:robustness}, they are
+traced by local projections \citep{jorda2005projections}, which estimate the
+response at each horizon by a separate regression rather than extrapolating it
+from a fitted process.
+
+\subsection{What the residual is not}
+
+The residual is descriptive. A positive value means the wage floor rose faster
+than the benchmark; it does not mean the increase caused inflation, and the
+correlation between the residual and subsequent inflation cannot settle that
+question, because statutory changes respond to the same conditions that drive
+prices. Section~\ref{sec:robustness} sets out what would be needed to make a
+causal statement, and why the Portuguese case does not currently supply it.

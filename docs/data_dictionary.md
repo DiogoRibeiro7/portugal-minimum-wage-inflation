@@ -115,7 +115,7 @@ fourteen-payment convention.
 | Column | Type | Meaning |
 | ------ | ---- | ------- |
 | `year` | int | Calendar year. |
-| `minimum_wage_january` | float | Level legally in force on 1 January. |
+| `minimum_wage_january` | float | Level legally in force on 1 January, or missing where none was. It is missing in 1974: the floor was introduced on 27 May. |
 | `minimum_wage_mean` | float | Level averaged over the days of the year. |
 | `statutory_acts` | int | Number of acts taking effect during the year. |
 | `coverage_fraction` | float | Share of days in the year with a statutory wage in force. |
@@ -156,7 +156,8 @@ price index and AMECO productivity. One row per year, 1974 onwards.
 | `productivity_index` | Productivity, first year = 100. |
 | `minimum_wage_to_productivity_index` | Real wage per unit of productivity, first year = 100. |
 | `log_minimum_wage_growth` | First difference of the log nominal wage. |
-| `cumulative_policy_residual` | Running sum of the residual. |
+| `cumulative_policy_gap` | Compounded gap between the wage and the benchmark, cumulated to that year. |
+| `summed_annual_residual` | Running arithmetic sum of the annual residuals. |
 
 The benchmark **compounds** rather than adds. At the inflation rates of the
 early 1980s the additive approximation understates it by more than a
@@ -308,3 +309,19 @@ value is populated and plausible, every range check passes, and the regression
 runs — but the regressor is constant across regions and identifies nothing. See
 `docs/research_design.md` for why the available Portuguese sources are in
 exactly that position.
+
+### Why the gap compounds
+
+`cumulative_policy_gap` multiplies the annual growth ratios rather than adding
+the residuals:
+
+```text
+cumulative_policy_gap_T = prod_t (1 + g_MW_t) / (1 + benchmark_t) - 1
+```
+
+The benchmark itself compounds productivity with prior inflation precisely
+because addition is wrong over long horizons at high inflation, so summing the
+residuals it produces would reintroduce that error. Over the Portuguese sample
+the two differ by a factor of nearly two, and the arithmetic sum passes -100
+percentage points, which cannot be read as a cumulative shortfall.
+`summed_annual_residual` is retained for comparison and is named for what it is.

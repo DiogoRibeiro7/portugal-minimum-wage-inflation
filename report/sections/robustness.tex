@@ -1,2 +1,100 @@
-\section{Robustness}
-% Generated results and publication-ready text will be added after the empirical pipeline is validated.
+\section{The limits of regional identification}
+\label{sec:robustness}
+
+The obvious way to move from the accounting of Section~\ref{sec:results} to a
+causal statement about prices is to exploit the autonomous regions, which may
+set a minimum wage above the mainland's. This section reports why that design
+cannot be carried in Portugal. We present it as a result, because the reasons
+are specific and checkable rather than a general complaint about power.
+
+\subsection{How much variation actually exists}
+
+Under a specification with region-by-category and calendar-time fixed effects,
+what identifies a coefficient is the set of region-months in which the statutory
+change differs from the mainland's. Counting them is not the same as counting
+observations, and the difference is large.
+
+The Azores contribute one month. Their supplement is proportional, so
+$\Delta \log MW$ in the Azores equals $\Delta \log MW$ on the mainland exactly
+in every month after the supplement took effect; the region adds rows to the
+panel and not one degree of freedom. Madeira contributes one month per act.
+Over the estimation window, and after excluding the years for which Madeira
+legislated but the act is not yet in our register, \IdentifyingEvents{}
+region-months diverge, across \IdentifyingRegions{} region.
+
+We stress the direction of this problem. A gap in the register is not neutral:
+if a region legislated in a year whose act is missing, its wage appears frozen
+against a rising national one, which is indistinguishable from a deliberate
+freeze and enters the estimation as a policy shock that never happened. The
+pipeline therefore requires known-incomplete years to be declared, and marks the
+transitions into and out of them unestimable rather than treating them as
+observed changes.
+
+\subsection{Why conventional inference cannot be trusted here}
+
+Cluster-robust standard errors are justified asymptotically in the number of
+clusters, and Portugal has few regions. That conventional inference over-rejects
+in this situation, and that a wild cluster bootstrap corrects it, is established
+\citep{cameron2008bootstrap}. In simulation with seven clusters and a
+true null, the conventional test rejects at the five per cent level about twenty
+per cent of the time, while a restricted wild cluster bootstrap holds its size.
+With so few clusters the bootstrap can enumerate the entire space of sign
+vectors, so its $p$-value is exact rather than simulated.
+
+This is not a refinement. It is the difference between a result and an artefact,
+and Table~\ref{tab:regional-design} shows it on the actual data.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Cumulative price response to the statutory change, regional design.
+  Estimated over the window in which Madeira's register is contiguous, with
+  region-category and calendar-time fixed effects, clustered on region.}
+  \label{tab:regional-design}
+  \input{tables/regional_design}
+\end{table}
+
+Conventional inference calls \ClusteredHighlySignificant{} of the
+\HorizonsEstimated{} horizons significant at the one-tenth of one per cent
+level. The bootstrap rejects none of them at five per cent: its smallest
+$p$-value is \MinBootstrapP{}. Had we reported only the third column, the paper
+would have claimed substantial pass-through of minimum-wage costs into consumer
+prices within months of implementation.
+
+The magnitudes are the second reason to distrust them. The largest coefficient
+is \PeakCoefficient{} at \PeakHorizon{}~months, which would imply prices rising
+by more than the wage shock itself. An estimate identified by
+\IdentifyingEvents{} events in one small, remote, tourism-intensive region is
+picking up whatever else was happening in Madeira, and the bootstrap is
+detecting exactly that.
+
+\subsection{The alternative design, and why it also falls short}
+
+If regional variation is unavailable, the remaining variation is across
+consumption categories facing a common national change. Rather than impose an
+exposure measure -- one that would require minimum-wage coverage by region and
+industry jointly, that no Portuguese source publishes, and whose shift-share
+construction carries assumptions of its own
+\citep{goldsmithpinkham2020bartik} -- the differential response can be estimated
+directly, one coefficient per category.
+
+That design cannot carry calendar-time fixed effects, because a national shock
+does not vary across regions within a month; time effects would absorb it
+entirely. It therefore identifies each category relative to the others and is
+exposed to anything else moving national prices at the same time. The estimated
+ranking is partly plausible: food and, next, restaurants and accommodation sit
+at the top, and accommodation and food services is the activity with by far the
+highest measured minimum-wage coverage. But clothing and footwear returns a
+large negative coefficient that survives category-specific linear trends, which
+points to a break or a rebasing in that series rather than to any price
+response. Until that is diagnosed the ranking is not reportable, because
+whatever corrupts one category may be moving the others less visibly.
+
+\subsection{What would change the conclusion}
+
+Three things, in descending order of value. Registering Madeira's acts for
+2010--2018, 2021 and 2022, each from primary law, would roughly quadruple the
+identifying events. Minimum-wage coverage published by NUTS~II region and
+economic activity jointly would permit the exposure design the literature
+favours. And a longer regional price series at consumption-purpose detail would
+allow pre-trend testing over a window long enough to be informative. None of
+these is unobtainable; none is available now.

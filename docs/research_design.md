@@ -2,67 +2,101 @@
 
 ## Publication objective
 
-Estimate whether increases in Portugal's statutory minimum wage generate measurable consumer-price inflation once productivity, pre-existing inflation, sectoral labour-cost exposure, and concurrent macroeconomic shocks are separated.
+Document the long-run relationship between Portugal's statutory minimum wage,
+consumer prices and labour productivity from the introduction of the wage floor
+in 1974, on a basis reconstructed from primary law; and establish what the
+available regional variation can and cannot identify about the price
+pass-through of minimum-wage policy.
 
-The paper must not identify the effect from a raw national time series alone. National minimum-wage changes are endogenous to inflation, productivity, political decisions, and the business cycle.
+This is a revision of the project's original objective, which was to estimate
+pass-through causally from regional and sectoral exposure. That objective is not
+attainable with the variation Portugal supplies, and the reasons are recorded
+below rather than treated as unfinished work. Stating them is more useful to a
+reader than a weakly identified estimate.
 
 ## Contribution architecture
 
-### Contribution 1: long-run historical accounting
+### Contribution 1: the statutory series, from primary law
 
-Build the first reproducible annual series, starting with the 1974 introduction, that jointly tracks:
+A reproducible statutory minimum-wage series covering 1974 to the present, with
+every value read from the act that set it, retrieved from the Diário da
+República by permanent identifier. It carries features that secondary
+compilations flatten:
 
-- statutory minimum wage;
-- CPI inflation;
-- real labour productivity;
-- real minimum wage;
-- minimum wage relative to productivity;
-- minimum-wage bite where available;
-- a productivity-plus-lagged-inflation wage benchmark;
-- the residual of actual minimum-wage growth relative to that benchmark.
+- three legally distinct minimum wages coexisted until 1991 and two until 2004,
+  so a single pre-2005 series is a choice that must be stated;
+- the official published history omits the act effective in 2000, while its 2001
+  entries state their increase relative to it;
+- the autonomous regions set their wages by different mechanisms, which matters
+  for identification and not only for description;
+- the statutory wage is paid fourteen times a year, so international
+  compilations expressed on a twelve-month basis are about seventeen per cent
+  higher than the figure in Portuguese law.
 
-This layer documents regimes and motivates the causal design. It is not by itself the core novelty claim.
+### Contribution 2: the long-run accounting
 
-### Contribution 2: regional and sectoral pass-through
+An annual series from 1974 tracking the minimum wage, CPI inflation, real labour
+productivity, the real minimum wage, the wage floor relative to productivity, a
+productivity-plus-lagged-inflation benchmark, and the residual of statutory
+growth against that benchmark. The benchmark compounds rather than adds, which
+matters at the inflation rates of the early 1980s.
 
-Use public GEP data to measure the pre-existing share of workers covered by the RMMG across NUTS II regions and industries. Combine this with monthly regional CPI by consumption purpose from INE.
+This layer is descriptive and is the paper's principal empirical content. It is
+not causal and is not presented as such.
 
-Where statutory schedules can be reconstructed, use Madeira and the Azores as additional policy variation because their regional minimum wage can differ from mainland Portugal.
+### Contribution 3: a documented negative identification result
 
-### Contribution 3: structural price exposure
+An account of why regional variation cannot identify pass-through in Portugal,
+specific enough to be checked:
 
-Construct a transparent cost-exposure index that maps industry-level minimum-wage exposure into consumption categories:
+- the Azorean supplement is proportional, so in logs the Azorean statutory
+  change equals the mainland's in every month after it took effect, and the
+  region contributes no independent timing;
+- Madeira is the only source of genuine divergence;
+- with the small number of Portuguese regions, conventional cluster-robust
+  inference rejects a true null far above its nominal size, and the estimates it
+  calls highly significant survive none of a wild cluster bootstrap;
+- a gap in the statutory register is not neutral, because an unregistered act
+  appears as a frozen wage against a rising national one and enters the
+  estimation as a shock that never happened.
 
-\[
-E_{rct}=\sum_s b_{rs,0}\,\ell_{st}\,\omega_{cs}\,\Delta\log MW_{rt},
-\]
+## Estimands retained for the descriptive layer
 
-where:
+For annual minimum wage growth `g_MW`, productivity growth `g_A` and inflation
+`pi`:
 
-- \(b_{rs,0}\) is a predetermined minimum-wage bite for region \(r\) and sector \(s\);
-- \(\ell_{st}\) is the labour-cost share;
-- \(\omega_{cs}\) maps production industry \(s\) to consumption category \(c\);
-- \(\Delta\log MW_{rt}\) is the applicable statutory minimum-wage change.
+```text
+benchmark_t = (1 + g_A_t) * (1 + pi_{t-1}) - 1
+residual_t  = g_MW_t - benchmark_t
+```
 
-This is preferable to treating a 7% increase in the statutory minimum wage as a 7% economy-wide wage-cost shock.
+The residual is an accounting object. A positive value means the wage floor rose
+faster than the benchmark; it does not mean the increase caused inflation, and
+the correlation between the residual and subsequent inflation cannot settle the
+question, because statutory changes respond to the same conditions that drive
+prices.
 
-## Primary estimand
+## Minimum publication standard, as revised
 
-For horizon \(h\), estimate the cumulative price response to a one-percentage-point increase in predicted minimum-wage-induced unit cost exposure:
+The original standard required pre-trend diagnostics, small-cluster inference,
+predetermined exposure and robustness to alternative exposure definitions before
+any causal conclusion. That standard is retained and is not met, which is why no
+causal conclusion is drawn. The revised standard for what the paper does claim
+is narrower and is met:
 
-\[
-\Delta_h \log P_{r,c,t+h}
-=\alpha_{rc}+\lambda_t+\beta_h E_{rct}+\Gamma X_{rct}+\varepsilon_{r,c,t+h}.
-\]
+1. every statutory value is traceable to the act that set it;
+2. every price and productivity series is retrieved reproducibly and checksummed;
+3. the accounting identities are verified on every build;
+4. no number in the manuscript is transcribed by hand;
+5. the limits of identification are quantified rather than asserted.
 
-The sequence \(\beta_h\) is the dynamic pass-through function.
+## What the pass-through machinery is retained for
 
-## Alternative estimands
-
-1. Price elasticity with respect to the statutory minimum wage, interacted with predetermined bite.
-2. Inflation acceleration after a policy residual defined relative to productivity and lagged inflation.
-3. Difference in price responses between labour-intensive and low-labour-intensity CPI categories.
-4. Difference in pass-through between expansion, crisis, pandemic, and high-inflation regimes.
+The estimators, few-cluster inference and falsification checks remain in the
+repository and are exercised against the real panels. They support Contribution
+3: the regional estimates are reported precisely to show the gap between what
+conventional inference claims and what the bootstrap supports. They are not used
+to make a causal claim.
 
 ## Identification threats
 

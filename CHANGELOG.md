@@ -93,6 +93,11 @@ was.
 
 ### Changed
 
+- Manuscript restructured around the long-run record. The paper now documents
+  the statutory series built from primary law, the real erosion of the wage
+  floor against productivity, and a negative identification result explaining
+  why regional variation cannot identify pass-through in Portugal. No causal
+  claim is made.
 - The 2000 statutory values are read from Decreto-Lei n.º 573/99 rather than
   taken from Eurostat. With that act and its domestic-service value included,
   every stated increase in the published history reconciles with the act
@@ -114,6 +119,11 @@ was.
 
 ### Fixed
 
+- The manuscript bibliography. Nothing in the paper cited anything, and the
+  build ran a single LaTeX pass with no bibtex step, so the reference list was
+  empty and the build still exited zero. `make paper` now runs the full cycle
+  and fails on unresolved citations, and the test suite checks citation keys
+  and entry completeness independently of the build.
 - The registered GEP bulletin link is withdrawn upstream: the host now answers
   200 with an HTML landing page for every path. It is disabled with a recorded
   reason instead of silently storing that page as a spreadsheet.

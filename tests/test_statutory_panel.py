@@ -72,13 +72,23 @@ def test_annual_series_spans_the_whole_history(panel: pd.DataFrame) -> None:
     years = annual["year"].to_list()
     assert years[0] == 1974
     assert years == list(range(years[0], years[-1] + 1))
-    assert annual["minimum_wage_january"].is_monotonic_increasing
+    # 1974 has no January level, since the floor was introduced on 27 May.
+    assert pd.isna(annual.set_index("year").loc[1974, "minimum_wage_january"])
+    assert annual["minimum_wage_january"].dropna().is_monotonic_increasing
+    assert annual["minimum_wage_mean"].is_monotonic_increasing
 
 
 def test_first_year_is_marked_as_partial(panel: pd.DataFrame) -> None:
-    """1974 was not a full year of statutory coverage and must say so."""
+    """1974 was not a full year of statutory coverage and must say so.
+
+    The year is retained, because a wage existed for seven months of it, but it
+    has no 1 January level: the introduction of a floor is an event, not a
+    percentage increase over a previous floor.
+    """
     annual = annual_minimum_wage(panel, scope="general").set_index("year")
     assert annual.loc[1974, "coverage_fraction"] < 0.7
+    assert pd.isna(annual.loc[1974, "minimum_wage_january"])
+    assert annual.loc[1974, "minimum_wage_mean"] > 0
     assert (annual.loc[1975:, "coverage_fraction"] == 1.0).all()
 
 

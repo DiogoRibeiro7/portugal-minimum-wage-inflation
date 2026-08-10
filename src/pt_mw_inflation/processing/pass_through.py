@@ -172,6 +172,18 @@ def build_regional_shock(
         # in exactly that month, which is where a region's divergence lives.
         block["delta_log_minimum_wage"] = np.log(block["minimum_wage"]).diff()
         block.loc[block.index[0], "delta_log_minimum_wage"] = np.nan
+
+        # Entering or leaving a declared gap moves the series between the
+        # region's own level and the national one. That step is an artefact of
+        # the register, not a wage change anybody legislated, so it is marked
+        # unestimable rather than passed to the estimator as a shock.
+        region_gaps = (gap_years or {}).get(region)
+        if region_gaps:
+            years = pd.Series(months.year, index=months)
+            in_gap = years.isin(region_gaps).to_numpy()
+            boundary = np.zeros(len(months), dtype=bool)
+            boundary[1:] = in_gap[1:] != in_gap[:-1]
+            block.loc[boundary, "delta_log_minimum_wage"] = np.nan
         blocks.append(block)
 
     return pd.concat(blocks, ignore_index=True)
@@ -224,6 +236,7 @@ def build_estimation_panel(
     *,
     start: str = "2000-01",
     include_total: bool = False,
+    gap_years: dict[str, frozenset[int]] | None = None,
 ) -> pd.DataFrame:
     """Join regional prices to the applicable statutory wage.
 
@@ -232,6 +245,10 @@ def build_estimation_panel(
         wage_panel: Statutory panel, general regime.
         start: First month to retain.
         include_total: Keep the all-items index alongside the categories.
+        gap_years: Per-region years missing from the statutory register. Passing
+            them is what keeps a hole in the register out of the estimation; a
+            builder that accepts them but never forwards them leaves the
+            artefact in the output while appearing to remove it.
 
     Returns:
         One row per region, category and month, with `log_price`, the wage in
@@ -255,7 +272,7 @@ def build_estimation_panel(
 
     months = pd.DatetimeIndex(sorted(frame["month"].unique()))
     regions = sorted(frame["nuts_code"].unique())
-    shock = build_regional_shock(wage_panel, months, regions)
+    shock = build_regional_shock(wage_panel, months, regions, gap_years=gap_years)
 
     merged = frame.merge(shock, on=["nuts_code", "month"], how="inner")
     if merged.empty:

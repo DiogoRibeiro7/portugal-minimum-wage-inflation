@@ -1,30 +1,10 @@
 \section{Long-run evidence}
 \label{sec:results}
 
-\input{tables/headline_macros}
-
 This section reports the historical accounting layer. It is descriptive. It
 documents what the statutory wage did relative to a productivity-and-inflation
 benchmark, and motivates the identification strategy; it is not itself evidence
 of a causal effect of minimum wages on prices.
-
-\subsection{The benchmark and the residual}
-
-For year $t$ the benchmark nominal wage growth compounds productivity growth
-with the previous year's inflation,
-%
-\begin{equation}
-  g^{\text{benchmark}}_{t} = (1 + g^{A}_{t})(1 + \pi_{t-1}) - 1,
-  \qquad
-  r_{t} = g^{MW}_{t} - g^{\text{benchmark}}_{t},
-  \label{eq:residual}
-\end{equation}
-%
-where $r_t$ is the policy residual. The benchmark compounds rather than adds.
-The distinction is immaterial at recent inflation rates and is not immaterial
-over the sample: with inflation near thirty per cent, as in the early 1980s, the
-additive approximation understates the benchmark by more than a percentage
-point, which exceeds most of the residuals being measured.
 
 \subsection{The wage floor against productivity}
 
@@ -61,14 +41,18 @@ produces than it did when it was introduced.
 \subsection{The residual by regime}
 
 Averaged over the sample the residual is \MeanResidualPct{} percentage points a
-year, and cumulates to \CumulativeResidualPct{} points. The average conceals a
-reversal, and Table~\ref{tab:regimes} shows it.
+year. The annual gaps must be compounded rather than summed, for the same reason
+the benchmark itself compounds: their arithmetic sum reaches
+\SummedResidualPct{} points, which cannot be read as a cumulative shortfall.
+Compounded, the statutory wage ended \CumulativeGapMagnitudePct{} per cent
+\CumulativeGapDirection{} where the benchmark would have put it. The average
+conceals a reversal, and Table~\ref{tab:regimes} shows it.
 
 \begin{table}[htbp]
   \centering
   \caption{Annual averages by policy regime, in per cent. $\pi$ is consumer
   price inflation, $g_A$ productivity growth, $g_{MW}$ statutory minimum-wage
-  growth, and the residual is defined in equation~\eqref{eq:residual}.}
+  growth, and the residual is defined in equation~\eqref{eq:residual} of Section~\ref{sec:methods}.}
   \label{tab:regimes}
   \input{tables/regime_summary}
 \end{table}

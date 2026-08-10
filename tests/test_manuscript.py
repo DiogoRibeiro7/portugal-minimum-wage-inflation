@@ -19,20 +19,41 @@ SECTIONS = REPORT / "sections"
 #: Commands defined by LaTeX, the preamble, or the generated tables, which the
 #: sections may use without the macro file defining them.
 _STRUCTURAL = re.compile(
-    r"^(section|subsection|subsubsection|label|ref|eqref|cite|citep|citet|input|includegraphics"
-    r"|begin|end|centering|caption|texttt|emph|textbf|textit|item|qquad|quad|text|pi|,|\\)$"
+    r"^(section|subsection|subsubsection|paragraph|label|ref|eqref|cite|citep|citet|input"
+    r"|includegraphics|begin|end|centering|caption|texttt|emph|textbf|textit|item|qquad|quad"
+    r"|text|pi|toprule|midrule|bottomrule"
+    # Greek letters are capitalised commands too, and are not generated
+    # quantities; without them every equation reads as an undefined citation.
+    r"|Delta|Gamma|Lambda|Omega|Sigma|Phi|Psi|Theta|Xi"
+    r"|,|\\)$"
 )
 
 _MACRO_USE = re.compile(r"\\([A-Za-z]+)\{?\}?")
-_MACRO_DEF = re.compile(r"\\newcommand\{\\([A-Za-z]+)\}")
+_MACRO_DEF = re.compile(r"\\(?:new|provide)command\{\\([A-Za-z]+)\}")
+_BIB_ENTRY = re.compile(r"@\w+\{([^,]+),")
+# natbib commands may be capitalised (\Citet) and may carry optional arguments
+# before the key list (\citep[see][p. 3]{key}). Missing either form would let a
+# citation with no bibliography entry pass the very check meant to catch it.
+_CITE = re.compile(r"\\[Cc]ite[a-zA-Z]*(?:\[[^\]]*\])*\{([^}]+)\}")
 
 
 def _generated_macros() -> set[str]:
-    """Names defined by the generated headline-macro file."""
-    path = REPORT / "tables" / "headline_macros.tex"
-    if not path.exists():
-        pytest.skip("headline macros not generated; run 'ptmw analyse macro'")
-    return set(_MACRO_DEF.findall(path.read_text(encoding="utf-8")))
+    """Names defined by any generated macro file.
+
+    Scanning the whole directory rather than one known file matters: a second
+    generator adding its own macros would otherwise make every quantity it
+    defines look undefined, and the failure would point at the prose instead of
+    at the test.
+    """
+    tables = REPORT / "tables"
+    sources = sorted(tables.glob("*macros*.tex")) if tables.exists() else []
+    if not sources:
+        pytest.skip("macros not generated; run 'ptmw analyse macro'")
+
+    defined: set[str] = set()
+    for path in sources:
+        defined |= set(_MACRO_DEF.findall(path.read_text(encoding="utf-8")))
+    return defined
 
 
 def _section_text() -> dict[str, str]:
@@ -64,9 +85,13 @@ def test_every_cited_quantity_is_generated() -> None:
     assert not unknown, f"sections cite undefined generated quantities: {unknown}"
 
 
-@pytest.mark.parametrize("section", ["results.tex"])
-def test_results_section_uses_macros_not_literals(section: str) -> None:
-    """The results prose must not hard-code the numbers it reports.
+@pytest.mark.parametrize("section", ["results.tex", "robustness.tex", "introduction.tex"])
+def test_empirical_sections_use_macros_not_literals(section: str) -> None:
+    """Empirical prose must not hard-code the numbers it reports.
+
+    Restricting this to one file is how a transcribed estimate got into the
+    identification section: the rule was enforced where results were expected
+    and not where they actually appeared.
 
     A decimal in the results text is almost always a transcribed estimate, which
     is exactly what the reproducibility rules forbid. Years and equation numbers
@@ -100,3 +125,44 @@ def test_generated_tables_carry_a_do_not_edit_banner() -> None:
 
     for path in generated:
         assert "Do not edit" in path.read_text(encoding="utf-8"), path.name
+
+
+def test_every_citation_key_exists_in_the_bibliography() -> None:
+    """A cited key with no entry silently drops from the reference list.
+
+    LaTeX reports this as a warning, not an error, so a single-pass build
+    produces a paper with an empty bibliography and exit code zero. That is how
+    the references went missing here, so the check is made independently of the
+    build.
+    """
+    bibliography = REPORT / "references.bib"
+    if not bibliography.exists():
+        pytest.skip("no bibliography present")
+
+    defined = set(_BIB_ENTRY.findall(bibliography.read_text(encoding="utf-8")))
+    cited: set[str] = set()
+    for text in _section_text().values():
+        for group in _CITE.findall(text):
+            cited |= {key.strip() for key in group.split(",")}
+
+    assert cited, "no section cites anything; the reference list would be empty"
+    assert not cited - defined, f"cited but absent from the bibliography: {sorted(cited - defined)}"
+
+
+def test_bibliography_entries_are_complete() -> None:
+    """An entry missing title, author or year renders as a stub."""
+    bibliography = REPORT / "references.bib"
+    if not bibliography.exists():
+        pytest.skip("no bibliography present")
+
+    text = bibliography.read_text(encoding="utf-8")
+    incomplete = []
+    for block in re.split(r"(?=@)", text):
+        match = _BIB_ENTRY.match(block.strip())
+        if match is None:
+            continue
+        for field in ("title", "author", "year"):
+            if re.search(field + r"\s*=", block) is None:
+                incomplete.append(f"{match.group(1)}:{field}")
+
+    assert not incomplete, f"incomplete bibliography entries: {incomplete}"
