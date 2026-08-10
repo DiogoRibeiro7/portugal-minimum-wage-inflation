@@ -40,7 +40,7 @@ dependencies = [
     "scipy>=1.15,<2.0",
     "matplotlib>=3.10,<4.0",
     "pypdf (>=6.0,<7.0)",
-    "cryptography>=49.0,<50.0",
+    "cryptography>=50.0.0,<51.0",
 ]
 
 [project.urls]
