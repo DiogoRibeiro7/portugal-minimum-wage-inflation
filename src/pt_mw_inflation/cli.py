@@ -10,6 +10,7 @@ import pandas as pd
 import typer
 import yaml
 
+from pt_mw_inflation.analysis.inference import detectable_effects
 from pt_mw_inflation.analysis.local_projections import estimate_panel_local_projections
 from pt_mw_inflation.analysis.outputs import (
     generate_macro_outputs,
@@ -507,10 +508,6 @@ def analyse_pass_through(
         )
 
 
-if __name__ == "__main__":
-    app()
-
-
 @analyse_app.command("exposure-design")
 def analyse_exposure_design(
     prices: Path = typer.Option(
@@ -570,11 +567,38 @@ def analyse_exposure_design(
     write_regional_design_table(estimates, destination, command="ptmw analyse exposure-design")
     write_exposure_design_macros(estimates, root / "report/tables/exposure_design_macros.tex")
 
+    exposure_frame = pd.read_parquet(root / exposure)
+    contrast = float(
+        exposure_frame["regional_bite_exposure"].max()
+        - exposure_frame["regional_bite_exposure"].min()
+    )
+    resolution = detectable_effects(estimates, contrast=contrast)
+    widest = max(resolution, key=lambda item: item.upper_pp - item.lower_pp)
+    smallest = min(resolution, key=lambda item: item.minimum_detectable_pp)
+
     typer.echo(f"Wrote {len(estimates)} horizon estimates to {destination.relative_to(root)}")
     typer.echo(f"  window from {start}, {panel['region'].nunique()} regions")
+    typer.echo(
+        f"  high-low exposure contrast {100 * contrast:.2f}pp; for a 10% statutory rise the "
+        f"design resolves differential responses down to {smallest.minimum_detectable_pp:.2f}pp"
+    )
+    typer.echo(
+        f"  widest interval: horizon {widest.horizon}, "
+        f"[{widest.lower_pp:.2f}, {widest.upper_pp:.2f}]pp. Judge the null by this, not by p."
+    )
     survivors = int((estimates["p_value_bootstrap_holm"] < 0.05).sum())
     typer.echo(
         f"  significant at 5%: {int((estimates['p_value_clustered'] < 0.05).sum())} by clustered "
         f"inference, {int((estimates['p_value_bootstrap'] < 0.05).sum())} by the bootstrap, "
         f"{survivors} after Holm"
     )
+
+
+# Kept last on purpose. Every command must be registered before ``app()`` is
+# reached, and this module registers some of them below where this block used
+# to sit: ``python -m pt_mw_inflation.cli analyse --help`` was omitting
+# ``exposure-design`` entirely. The installed console script was unaffected,
+# because import completes before it calls ``app()``, so the two entrypoints
+# disagreed about which commands existed.
+if __name__ == "__main__":
+    app()

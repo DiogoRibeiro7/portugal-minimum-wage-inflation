@@ -22,6 +22,7 @@ from pt_mw_inflation.processing.exposure import (
     PredeterminationError,
     activity_bite_from_registry,
     assess_identifying_variation,
+    bound_unmeasured_exposure,
     check_predetermined,
     measure_variation_strength,
     require_regional_variation,
@@ -430,3 +431,61 @@ def test_an_earlier_snapshot_makes_the_measure_predetermined() -> None:
     check_predetermined(
         select_snapshot(registry, "2015-10"), composition_year=2015, first_shock_year=2016
     )
+
+
+def _covered_exposure() -> pd.DataFrame:
+    """Two regions differing in how much of their employment is surveyed."""
+    return pd.DataFrame(
+        {
+            "region": ["PT1C", "PT1A"],
+            "measured_exposure": [0.155, 0.176],
+            "covered_employment_share": [0.734, 0.894],
+        }
+    )
+
+
+def test_bounding_the_unsurveyed_sectors_widens_the_spread() -> None:
+    """Conditioning on surveyed sectors compresses regional differences.
+
+    The unsurveyed sectors are not spread evenly: agriculture is outside the
+    survey and is a far larger share of employment in the Alentejo than around
+    Lisbon. Dividing it out therefore removes exactly the variation the measure
+    exists to capture, so the assumption has to be a parameter rather than a
+    normalisation.
+    """
+    exposure = _covered_exposure()
+    conditional = exposure["measured_exposure"] / exposure["covered_employment_share"]
+
+    at_zero = bound_unmeasured_exposure(exposure, 0.0)["regional_bite_exposure"]
+    assert at_zero.max() - at_zero.min() > conditional.max() - conditional.min()
+
+
+def test_bounding_at_the_measured_average_reproduces_the_conditional_measure() -> None:
+    """Renormalising is the special case where the unsurveyed match the surveyed.
+
+    Making that explicit is the point: the conditional measure is not
+    assumption-free, it assumes the sectors nobody looked at behave like the
+    ones who were.
+    """
+    exposure = pd.DataFrame(
+        {
+            "region": ["A", "B"],
+            "measured_exposure": [0.15, 0.15],
+            "covered_employment_share": [0.75, 0.5],
+        }
+    )
+    bounded = bound_unmeasured_exposure(exposure, 0.20)["regional_bite_exposure"]
+    assert bounded.tolist() == pytest.approx([0.15 + 0.25 * 0.20, 0.15 + 0.50 * 0.20])
+
+
+def test_an_incidence_outside_the_unit_interval_is_refused() -> None:
+    """A bite is a proportion; a percentage here would inflate every region."""
+    with pytest.raises(ExposureError, match="must be a proportion"):
+        bound_unmeasured_exposure(_covered_exposure(), 21.0)
+
+
+def test_bounding_requires_the_unconditional_numerator() -> None:
+    """The conditional column alone cannot be completed."""
+    exposure = _covered_exposure().drop(columns=["measured_exposure"])
+    with pytest.raises(ExposureError, match="missing columns"):
+        bound_unmeasured_exposure(exposure, 0.1)

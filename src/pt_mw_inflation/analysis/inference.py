@@ -33,6 +33,7 @@ from itertools import product
 
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 
 FloatArray = npt.NDArray[np.float64]
 
@@ -391,3 +392,82 @@ def holm_adjusted(p_values: Sequence[float]) -> list[float]:
         running = max(running, min(1.0, (count - rank) * values[index]))
         adjusted[index] = running
     return adjusted
+
+
+@dataclass(frozen=True)
+class DetectableEffect:
+    """What a design could have found, alongside what it did find.
+
+    Attributes:
+        horizon: Horizon the estimate belongs to.
+        coefficient: Point estimate.
+        effect_pp: Implied differential price response, in percentage points,
+            between the most and least exposed region for the stated statutory
+            rise.
+        lower_pp: Lower end of the 95 per cent interval, same units.
+        upper_pp: Upper end of the 95 per cent interval, same units.
+        minimum_detectable_pp: Smallest such response the design would reject a
+            null against, at 80 per cent power and five per cent size.
+    """
+
+    horizon: int
+    coefficient: float
+    effect_pp: float
+    lower_pp: float
+    upper_pp: float
+    minimum_detectable_pp: float
+
+
+#: Two-sided 5 per cent critical value plus the 80 per cent power quantile. The
+#: conventional multiplier for a minimum detectable effect.
+_MDE_MULTIPLIER = 2.802
+
+
+def detectable_effects(
+    estimates: pd.DataFrame, *, contrast: float, statutory_rise: float = 0.10
+) -> list[DetectableEffect]:
+    """Express each estimate, and the design's resolution, in price points.
+
+    Failing to reject a null is not evidence that the effect is zero. It is
+    only informative if the design could have detected an effect worth caring
+    about, and whether it could is a property of the standard error and the
+    spread of the regressor rather than of the p-value. Reporting the point
+    estimate beside the smallest effect the design could have found is what
+    separates "no pass-through" from "this cannot see pass-through".
+
+    Args:
+        estimates: Horizon estimates carrying `coefficient` and
+            `standard_error`.
+        contrast: Exposure difference between the most and least exposed
+            region, in the same units the coefficient was estimated on.
+        statutory_rise: Log statutory increase the effect is quoted for.
+
+    Returns:
+        One record per horizon, in percentage points.
+
+    Raises:
+        ValueError: If columns are missing, or the contrast is not positive,
+            which would make every scaled quantity zero and read as precision.
+    """
+    missing = {"horizon", "coefficient", "standard_error"}.difference(estimates.columns)
+    if missing:
+        raise ValueError(f"estimates missing columns: {sorted(missing)}")
+    if contrast <= 0:
+        raise ValueError(f"exposure contrast must be positive, got {contrast}")
+
+    scale = 100.0 * contrast * statutory_rise
+    horizons = estimates["horizon"].astype(int).tolist()
+    coefficients = estimates["coefficient"].astype(float).tolist()
+    errors = estimates["standard_error"].astype(float).tolist()
+
+    return [
+        DetectableEffect(
+            horizon=horizon,
+            coefficient=coefficient,
+            effect_pp=scale * coefficient,
+            lower_pp=scale * (coefficient - 1.96 * error),
+            upper_pp=scale * (coefficient + 1.96 * error),
+            minimum_detectable_pp=scale * _MDE_MULTIPLIER * error,
+        )
+        for horizon, coefficient, error in zip(horizons, coefficients, errors, strict=True)
+    ]

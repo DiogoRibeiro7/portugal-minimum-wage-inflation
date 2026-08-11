@@ -324,18 +324,32 @@ def test_a_shock_that_never_moves_is_refused() -> None:
 
 
 def _exposure_panel() -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Two regions of unequal exposure facing one national statutory change."""
+    """Two regions of unequal exposure, one of which legislates its own wage.
+
+    The divergence is deliberate and is the point. An earlier version of this
+    fixture gave both regions the same statutory change, so the design could
+    silently have been multiplying exposure by the *applicable regional* change
+    and every test would still have passed. Madeira's change differs from the
+    mainland's in most years of the real window, so a fixture without that
+    difference cannot test the thing that matters.
+    """
     months = pd.date_range("2016-01-01", "2016-06-01", freq="MS")
-    rows = [
-        {
-            "region": region,
-            "month": month,
-            "delta_log_minimum_wage": 0.05 if month.month == 1 else 0.0,
-        }
-        for region in ("PT11", "PT15")
-        for month in months
-    ]
-    exposure = pd.DataFrame({"region": ["PT11", "PT15"], "regional_bite_exposure": [0.25, 0.15]})
+    rows = []
+    for region in ("PT11", "PT30"):
+        for month in months:
+            national = 0.05 if month.month == 1 else 0.0
+            # PT30 legislates a larger rise in the same month.
+            applicable = (0.09 if region == "PT30" else national) if month.month == 1 else 0.0
+            rows.append(
+                {
+                    "region": region,
+                    "month": month,
+                    "delta_log_minimum_wage": applicable,
+                    "delta_log_national_minimum_wage": national,
+                    "statutory_divergence": applicable - national,
+                }
+            )
+    exposure = pd.DataFrame({"region": ["PT11", "PT30"], "regional_bite_exposure": [0.25, 0.15]})
     return pd.DataFrame(rows), exposure
 
 
@@ -350,11 +364,41 @@ def test_exposure_scales_the_national_shock_by_region() -> None:
     merged = add_exposure_interaction(panel, exposure)
 
     january = merged.loc[merged["month"].dt.month == 1].set_index("region")
-    # Centred exposure is +/- 0.05 around a mean of 0.20.
+    # Centred exposure is +/- 0.05 around a mean of 0.20, times the *national*
+    # change of 0.05 in both regions.
     assert january.loc["PT11", "exposure_shock"] == pytest.approx(0.05 * 0.05)
-    assert january.loc["PT15", "exposure_shock"] == pytest.approx(-0.05 * 0.05)
+    assert january.loc["PT30", "exposure_shock"] == pytest.approx(-0.05 * 0.05)
     # No statutory change means no shock, whatever the region's exposure.
     assert (merged.loc[merged["month"].dt.month > 1, "exposure_shock"] == 0.0).all()
+
+
+def test_the_interaction_ignores_a_region_legislating_its_own_wage() -> None:
+    """The regressor must carry composition, not Madeira's own policy.
+
+    PT30 raises its wage by nine log points where the mainland raises by five.
+    Had the interaction used the applicable regional change, PT30's shock would
+    be its centred exposure times 0.09 and would move if its legislature acted
+    differently. The manuscript describes a national shock scaled by exposure,
+    and with exposure as flat as it is, the regional component could carry the
+    estimate while the paper reported it as a shift-share result.
+    """
+    panel, exposure = _exposure_panel()
+    merged = add_exposure_interaction(panel, exposure)
+    january = merged.loc[merged["month"].dt.month == 1].set_index("region")
+
+    assert january.loc["PT30", "exposure_shock"] == pytest.approx(-0.05 * 0.05)
+    assert january.loc["PT30", "exposure_shock"] != pytest.approx(-0.05 * 0.09)
+
+    # Doubling Madeira's own divergence must leave the regressor untouched.
+    diverged = panel.copy()
+    mask = (diverged["region"] == "PT30") & (diverged["month"].dt.month == 1)
+    diverged.loc[mask, "delta_log_minimum_wage"] *= 2
+    diverged.loc[mask, "statutory_divergence"] = (
+        diverged.loc[mask, "delta_log_minimum_wage"]
+        - diverged.loc[mask, "delta_log_national_minimum_wage"]
+    )
+    again = add_exposure_interaction(diverged, exposure)
+    assert again["exposure_shock"].tolist() == merged["exposure_shock"].tolist()
 
 
 def test_a_region_coding_mismatch_is_refused_not_silently_dropped() -> None:
