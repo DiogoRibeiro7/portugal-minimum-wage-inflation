@@ -14,6 +14,7 @@ from pt_mw_inflation.processing.pass_through import (
     build_estimation_panel,
     build_regional_shock,
     count_identifying_events,
+    diagnose_seasonal_confound,
     monthly_statutory_wage,
 )
 
@@ -229,3 +230,93 @@ def test_a_regional_premium_above_the_floor_is_preserved() -> None:
 
     stepped = monthly_statutory_wage(panel, months, geography="PT30", fallback=national)
     assert (stepped == 615.0).all()
+
+
+def _seasonal_panel() -> tuple[pd.DataFrame, pd.Series]:
+    """A shock that only ever moves in January, and a category that crashes then.
+
+    This is the Portuguese case in miniature: the statutory wage steps every
+    1 January, and clothing collapses in the same month because winter sales
+    enter the index. Nothing about the price series is wrong.
+    """
+    months = pd.date_range("2015-01-01", "2019-12-01", freq="MS")
+    rows = []
+    for code, january_swing in (("03", -0.16), ("01", 0.01)):
+        level = 100.0
+        for month in months:
+            level *= 1.0 + (january_swing if month.month == 1 else 0.02)
+            rows.append({"category_code": code, "month": month, "price_index": level})
+    prices = pd.DataFrame(rows)
+
+    wage = pd.Series([600.0 + 20.0 * (month.year - 2015) for month in months], index=months)
+    return prices, np.log(wage)
+
+
+def test_a_january_only_shock_is_reported_as_confounded_with_january() -> None:
+    """A policy that always moves in one month is collinear with that month."""
+    prices, shock = _seasonal_panel()
+    confound = diagnose_seasonal_confound(prices, shock)
+
+    assert confound.modal_month == 1
+    assert confound.modal_share == pytest.approx(1.0)
+
+
+def test_the_confound_names_the_category_it_distorts_most() -> None:
+    """The diagnosis has to point at the series, not merely report a number.
+
+    Clothing swings sixteen times as far as food in January, which is why its
+    coefficient is the one that looks broken.
+    """
+    prices, shock = _seasonal_panel()
+    confound = diagnose_seasonal_confound(prices, shock)
+
+    assert confound.worst_category == "03"
+    assert confound.worst_category_swing < -10.0
+
+
+def test_month_effects_leave_nothing_when_the_shock_is_purely_seasonal() -> None:
+    """Correcting the artefact costs the variation that identified it.
+
+    A shock occurring in the same month every year, at the same size, is
+    perfectly explained by a month-of-year indicator, so nothing survives. That
+    is the design failing, not the correction working.
+    """
+    months = pd.date_range("2015-01-01", "2019-12-01", freq="MS")
+    prices = pd.DataFrame(
+        [{"category_code": "01", "month": month, "price_index": 100.0} for month in months]
+    )
+    constant_step = pd.Series(
+        [np.log(600.0 * 1.05 ** (month.year - 2015)) for month in months], index=months
+    )
+    confound = diagnose_seasonal_confound(prices, constant_step)
+    assert confound.surviving_variance_share == pytest.approx(0.0, abs=1e-9)
+
+
+def test_a_shock_spread_across_months_is_not_confounded() -> None:
+    """The diagnostic must not condemn a policy that moves at varied dates."""
+    months = pd.date_range("2015-01-01", "2019-12-01", freq="MS")
+    prices = pd.DataFrame(
+        [{"category_code": "01", "month": month, "price_index": 100.0} for month in months]
+    )
+    # Steps at irregular intervals, so they fall in different calendar months
+    # and no single month can explain them.
+    steps = {3, 9, 16, 26, 31, 40, 44, 53}
+    levels, level = [], 600.0
+    for index in range(len(months)):
+        if index in steps:
+            level *= 1.03
+        levels.append(level)
+    confound = diagnose_seasonal_confound(prices, pd.Series(np.log(levels), index=months))
+
+    assert confound.modal_share < 0.5
+    assert confound.surviving_variance_share > 0.3
+
+
+def test_a_shock_that_never_moves_is_refused() -> None:
+    """A constant wage carries no variation to diagnose."""
+    months = pd.date_range("2015-01-01", "2015-12-01", freq="MS")
+    prices = pd.DataFrame(
+        [{"category_code": "01", "month": month, "price_index": 100.0} for month in months]
+    )
+    with pytest.raises(PassThroughError, match="never changes"):
+        diagnose_seasonal_confound(prices, pd.Series(np.log(600.0), index=months))
