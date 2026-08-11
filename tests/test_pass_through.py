@@ -374,3 +374,34 @@ def test_missing_exposure_columns_are_reported() -> None:
     panel, exposure = _exposure_panel()
     with pytest.raises(PassThroughError, match="exposure missing columns"):
         add_exposure_interaction(panel, exposure.drop(columns=["regional_bite_exposure"]))
+
+
+def test_the_confound_does_not_depend_on_how_far_back_prices_reach() -> None:
+    """Both halves of the diagnosis must describe the same window.
+
+    The shock statistics are computed over the months the shock is defined on;
+    the category seasonal was being averaged over the whole price panel. The
+    reported swing then moved with how far back the panel happened to be
+    downloaded rather than with anything about the estimation, which a clean
+    rebuild exposed when the panel was refetched from 1991 instead of 2000.
+    """
+    months = pd.date_range("2010-01-01", "2019-12-01", freq="MS")
+    early = pd.date_range("1995-01-01", "2009-12-01", freq="MS")
+
+    def prices(index: pd.DatetimeIndex, january_swing: float) -> pd.DataFrame:
+        rows, level = [], 100.0
+        for month in index:
+            level *= 1.0 + (january_swing if month.month == 1 else 0.01)
+            rows.append({"category_code": "03", "month": month, "price_index": level})
+        return pd.DataFrame(rows)
+
+    # The early years carry a much milder January, so including them would drag
+    # the reported swing down if the windows were allowed to differ.
+    short = prices(months, -0.16)
+    long = pd.concat([prices(early, -0.02), short], ignore_index=True)
+
+    wage = pd.Series([np.log(600.0 + 20.0 * (m.year - 2010)) for m in months], index=months)
+
+    assert diagnose_seasonal_confound(short, wage).worst_category_swing == pytest.approx(
+        diagnose_seasonal_confound(long, wage).worst_category_swing
+    )
