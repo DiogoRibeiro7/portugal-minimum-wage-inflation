@@ -14,7 +14,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from pt_mw_inflation.analysis.outputs import write_exposure_macros, write_identification_macros
+from pt_mw_inflation.analysis.outputs import (
+    write_exposure_macros,
+    write_headline_macros,
+    write_identification_macros,
+)
 from pt_mw_inflation.processing.exposure import measure_variation_strength
 
 _DEFINE = re.compile(r"\\providecommand\{\\([A-Za-z]+)\}\{([^}]*)\}")
@@ -106,3 +110,31 @@ def test_the_bootstrap_claim_follows_the_run(
     written = _macros(write_identification_macros(_estimates(exhaustive), 3, 1, tmp_path / "i.tex"))
     assert written["BootstrapClusters"] == "9"
     assert expected in written["BootstrapBasis"]
+
+
+def test_the_base_year_sensitivity_is_generated(tmp_path: Path) -> None:
+    """The wage floor arrived in May, so its first year is not a full year.
+
+    Pairing a rate in force for eight months with a full-calendar-year price
+    and productivity observation is a convention, and the obvious check is to
+    rebase on the first complete year. Reporting it turns "the base year is
+    awkward" into a quantity a reader can weigh rather than a caveat.
+    """
+    macro = pd.DataFrame(
+        {
+            "year": [1974, 1975, 2025],
+            "minimum_wage": [16.46, 18.36, 870.0],
+            "policy_residual": [None, -0.12, 0.03],
+            "cumulative_policy_gap": [0.0, -0.1, -0.56],
+            "summed_annual_residual": [0.0, -0.1, -1.02],
+            "real_minimum_wage_index": [100.0, 96.8, 128.3],
+            "productivity_index": [100.0, 96.0, 257.0],
+            "minimum_wage_to_productivity_index": [100.0, 50.0, 25.0],
+        }
+    )
+    written = _macros(write_headline_macros(macro, tmp_path / "headline.tex"))
+
+    assert written["MacroSecondYear"] == "1975"
+    # Rebasing on a second year worth half the first doubles the end value.
+    assert written["WageToProductivityEnd"] == "25.0"
+    assert written["WageToProductivityEndAlt"] == "50.0"
