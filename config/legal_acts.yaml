@@ -36,19 +36,48 @@ regional:
     name: Região Autónoma da Madeira
     jurisdiction: m
     mechanism: explicit_value
-    # Madeira has legislated its own value since at least 2010; the acts for
-    # 2010-2018, 2021 and 2022 are not yet registered. Each must be added with
-    # its citation rather than inferred.
+    # Madeira does not legislate every year, and the years without an act are
+    # not holes. A regional decree fixes a value that stays in force until
+    # another replaces it, which the acts state themselves: DLR 18/2016/M
+    # expressly revokes DLR 13/2014/M, and DLR 1/2019/M revokes DLR 11/2017/M.
+    # So 2012, 2013, 2015 and 2018 carry the preceding act's value rather than
+    # lacking one, and are not declared as gaps.
     #
-    # These years are declared as gaps because a hole in the register is not
-    # neutral. Without the declaration the last registered level is carried
-    # across the hole while the national wage rises, which is indistinguishable
-    # from a deliberate freeze and enters the estimation as a policy shock that
-    # never happened. Declared gaps take the national wage instead.
-    gap_years: [2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2021, 2022]
+    # An earlier version of this file declared 2010-2018, 2021 and 2022 all
+    # unregistered. Nine of those years now have their act below, read from the
+    # Diário da República; the remaining four are the continuations just
+    # described. The declaration was a statement about this register, not about
+    # Madeira, and it is corrected rather than reinterpreted.
+    #
+    # The premium is not discretionary throughout. The preamble to DLR
+    # 18/2016/M states the policy as "acréscimos regionais de 2 %" on the
+    # mainland amount, a rule begun in 1987, and the values obey it exactly from
+    # 2010 to 2016: 475, 485, 505 and 530 times 1.02 give 484.50, 494.70,
+    # 515.10 and 540.60. From 2017 the acts depart from the rule and the premium
+    # widens. That matters for identification and not merely for description: a
+    # region on a fixed proportional rule contributes no independent timing, so
+    # Madeira's usable variation begins in 2017 and not in 2010.
+    #
+    # Years before 2010 remain genuinely unregistered. Madeira has legislated
+    # since 1987 and those acts are not here, so they are declared as gaps: a
+    # hole in the register is not neutral, since carrying the last known level
+    # across it while the national wage rises is indistinguishable from a
+    # deliberate freeze and enters the estimation as a shock that never
+    # happened. Declared gaps take the national wage instead.
+    gap_years: [2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009]
     acts:
+      # Effective dates are read from each act's own production-of-effects
+      # article, not assumed to be 1 January: DLR 13/2014/M takes effect on
+      # 1 October 2014, the same date as the national act it supplements.
+      - {act_type: declegreg, number: 5, act_date: 2010-04-19, effective_date: 2010-01-01}
+      - {act_type: declegreg, number: 9, act_date: 2011-04-11, effective_date: 2011-01-01}
+      - {act_type: declegreg, number: 13, act_date: 2014-11-05, effective_date: 2014-10-01}
+      - {act_type: declegreg, number: 18, act_date: 2016-03-28, effective_date: 2016-01-01}
+      - {act_type: declegreg, number: 11, act_date: 2017-04-13, effective_date: 2017-01-01}
       - {act_type: declegreg, number: 1, act_date: 2019-02-15, effective_date: 2019-01-01}
       - {act_type: declegreg, number: 2, act_date: 2020-03-03, effective_date: 2020-01-01}
+      - {act_type: declegreg, number: 6, act_date: 2021-03-15, effective_date: 2021-01-01}
+      - {act_type: declegreg, number: 5, act_date: 2022-03-17, effective_date: 2022-01-01}
       - {act_type: declegreg, number: 11, act_date: 2023-02-14, effective_date: 2023-01-01}
       - {act_type: declegreg, number: 3, act_date: 2024-02-08, effective_date: 2024-01-01}
       - {act_type: declegreg, number: 20, act_date: 2024-12-23, effective_date: 2025-01-01}

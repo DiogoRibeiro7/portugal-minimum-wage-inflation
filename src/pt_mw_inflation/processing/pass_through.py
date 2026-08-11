@@ -114,7 +114,17 @@ def monthly_statutory_wage(
         stepped = stepped.mask(in_gap)
 
     if fallback is not None:
-        stepped = stepped.fillna(pd.Series(fallback, index=months))
+        national = pd.Series(fallback, index=months)
+        stepped = stepped.fillna(national)
+        # The national wage is a floor everywhere in Portugal, and a regional
+        # act sets a supplement above it rather than a wage instead of it. A
+        # region that legislates intermittently can therefore be overtaken:
+        # Madeira's 2017 act stood at 570 through 2018, by which time the
+        # national wage was 580, so 580 was what actually bound. Carrying the
+        # regional level unconditionally would report a wage no employer could
+        # lawfully pay, and would record the region as diverging downwards in a
+        # year its premium had simply been extinguished.
+        stepped = stepped.where(stepped >= national, national)
     if stepped.isna().any():
         raise PassThroughError(f"{geography} has no wage in force for some months")
     return stepped
