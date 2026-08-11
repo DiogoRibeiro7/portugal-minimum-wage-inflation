@@ -198,6 +198,7 @@ def test_every_writer_defines_something() -> None:
         "write_headline_macros",
         "write_identification_macros",
         "write_exposure_macros",
+        "write_exposure_design_macros",
         "write_regional_premium_macros",
         "write_seasonality_macros",
     }
@@ -264,6 +265,8 @@ _ARTEFACT_PRODUCER = {
     "tables/premium_macros": "ptmw analyse pass-through",
     "tables/seasonality_macros": "ptmw analyse pass-through",
     "tables/exposure_macros": "ptmw build regional-exposure",
+    "tables/exposure_design": "ptmw analyse exposure-design",
+    "tables/exposure_design_macros": "ptmw analyse exposure-design",
 }
 
 _INPUT = re.compile(r"\\input\{(tables/[a-z_]+)\}")

@@ -11,6 +11,7 @@ import pytest
 from pt_mw_inflation.processing.pass_through import (
     PassThroughError,
     add_category_interactions,
+    add_exposure_interaction,
     build_estimation_panel,
     build_regional_shock,
     count_identifying_events,
@@ -320,3 +321,56 @@ def test_a_shock_that_never_moves_is_refused() -> None:
     )
     with pytest.raises(PassThroughError, match="never changes"):
         diagnose_seasonal_confound(prices, pd.Series(np.log(600.0), index=months))
+
+
+def _exposure_panel() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Two regions of unequal exposure facing one national statutory change."""
+    months = pd.date_range("2016-01-01", "2016-06-01", freq="MS")
+    rows = [
+        {
+            "region": region,
+            "month": month,
+            "delta_log_minimum_wage": 0.05 if month.month == 1 else 0.0,
+        }
+        for region in ("PT11", "PT15")
+        for month in months
+    ]
+    exposure = pd.DataFrame({"region": ["PT11", "PT15"], "regional_bite_exposure": [0.25, 0.15]})
+    return pd.DataFrame(rows), exposure
+
+
+def test_exposure_scales_the_national_shock_by_region() -> None:
+    """The interaction is what lets a common shock vary across regions.
+
+    Exposure is centred first, so the coefficient reads as the differential
+    response of a region one unit above average rather than as a level whose
+    meaning depends on where the exposure scale sits.
+    """
+    panel, exposure = _exposure_panel()
+    merged = add_exposure_interaction(panel, exposure)
+
+    january = merged.loc[merged["month"].dt.month == 1].set_index("region")
+    # Centred exposure is +/- 0.05 around a mean of 0.20.
+    assert january.loc["PT11", "exposure_shock"] == pytest.approx(0.05 * 0.05)
+    assert january.loc["PT15", "exposure_shock"] == pytest.approx(-0.05 * 0.05)
+    # No statutory change means no shock, whatever the region's exposure.
+    assert (merged.loc[merged["month"].dt.month > 1, "exposure_shock"] == 0.0).all()
+
+
+def test_a_region_coding_mismatch_is_refused_not_silently_dropped() -> None:
+    """An inner join on mismatched NUTS codes would return an empty panel.
+
+    Estimating on nothing is the failure that looks most like success, so it
+    has to be an error naming both codings.
+    """
+    panel, exposure = _exposure_panel()
+    renamed = exposure.assign(region=["PT1", "PT5"])
+    with pytest.raises(PassThroughError, match="no region matches"):
+        add_exposure_interaction(panel, renamed)
+
+
+def test_missing_exposure_columns_are_reported() -> None:
+    """A frame without the exposure column cannot be interacted."""
+    panel, exposure = _exposure_panel()
+    with pytest.raises(PassThroughError, match="exposure missing columns"):
+        add_exposure_interaction(panel, exposure.drop(columns=["regional_bite_exposure"]))
