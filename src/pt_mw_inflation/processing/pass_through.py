@@ -418,7 +418,16 @@ def diagnose_seasonal_confound(
     total = float(np.var(values))
     surviving = float(np.var(values - fitted)) / total if total > 0 else 0.0
 
+    # Restricted to the months the shock is defined over, so both halves of the
+    # diagnosis describe one window. Averaging the seasonal over the whole price
+    # panel instead made the reported swing depend on how far back the panel
+    # happened to be downloaded: extending it from 2000 to 1991 moved the figure
+    # by three and a half points while nothing about the estimation changed.
     growth = pd.DataFrame(np.log(wide.to_numpy()), index=wide.index, columns=wide.columns).diff()
+    growth = growth.loc[growth.index.isin(changes.index)]
+    if growth.empty:
+        raise PassThroughError("no price months coincide with the shock")
+
     price_months = pd.DatetimeIndex(growth.index)
     modal_swing = growth.loc[price_months.month == modal_month].mean()
     worst = str(modal_swing.abs().idxmax())

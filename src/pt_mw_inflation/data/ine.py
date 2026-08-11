@@ -240,9 +240,21 @@ def fetch_regional_cpi(
     """
     if batch_months < 1:
         raise IneError(f"batch_months must be positive, got {batch_months}")
+
+    # Clamped to what the indicator publishes, not to the calendar. Defaulting
+    # to the previous calendar month asks for a month Statistics Portugal has
+    # not released yet for roughly the first two weeks of every month, and the
+    # API answers an unpublished period by rejecting the entire batch it sits
+    # in. The failure therefore discards every year already retrieved and makes
+    # the whole pipeline succeed or fail according to the day it is run on.
+    _, published_to = fetch_published_range(indicator)
     if end is None:
-        previous = pd.Timestamp.today().to_period("M") - 1
-        end = f"{previous.year}-{previous.month:02d}"
+        end = f"{published_to.year}-{published_to.month:02d}"
+    elif pd.Timestamp(f"{end}-01") > published_to:
+        raise IneError(
+            f"indicator {indicator} publishes to {published_to:%Y-%m}, but {end} was requested; "
+            "the API would reject the whole batch rather than return the months that exist"
+        )
 
     periods = monthly_periods(start, end)
     records: list[dict[str, Any]] = []
@@ -372,3 +384,60 @@ def _retain(
         "status": status,
         "snapshot": snapshot,
     }
+
+
+#: Metadata for one indicator: its periodicity and the range it actually covers.
+INE_METADATA_API = "https://www.ine.pt/ine/json_indicador/pindicaMeta.jsp"
+
+
+def fetch_published_range(
+    indicator: str = REGIONAL_CPI_INDICATOR,
+    *,
+    timeout_seconds: int = 60,
+) -> tuple[pd.Timestamp, pd.Timestamp]:
+    """Return the first and last months the indicator actually publishes.
+
+    Asking for a month that does not exist is not a partial failure. The API
+    rejects the whole batch it appears in, with a message naming no period, so a
+    single unpublished month ends the run and takes thirty-five years of
+    retrieved data with it.
+
+    That is not a rare edge. Statistics Portugal releases a month's index in the
+    middle of the following month, so for roughly the first two weeks of every
+    month the previous month does not yet exist, and a pipeline that defaults to
+    "the previous calendar month" is broken for half of all the days it might be
+    run on. The published range is therefore read rather than assumed.
+
+    Args:
+        indicator: Indicator code.
+        timeout_seconds: Request timeout.
+
+    Returns:
+        The first and last published months.
+
+    Raises:
+        IneError: If the metadata is unreadable or names no period.
+    """
+    response = requests.get(
+        INE_METADATA_API,
+        params={"varcd": indicator, "lang": "PT"},
+        timeout=timeout_seconds,
+        headers={"User-Agent": USER_AGENT},
+    )
+    response.raise_for_status()
+
+    try:
+        payload = response.json()
+    except ValueError as error:
+        raise IneError(f"metadata for {indicator} is not JSON: {response.text[:120]}") from error
+
+    entries = payload if isinstance(payload, list) else [payload]
+    if not entries or not isinstance(entries[0], dict):
+        raise IneError(f"metadata for {indicator} carries no entry")
+
+    entry = entries[0]
+    first, last = entry.get("PrimeiroPeriodo"), entry.get("UltimoPeriodo")
+    if not first or not last:
+        raise IneError(f"metadata for {indicator} names no period range: {sorted(entry)[:8]}")
+
+    return parse_period_label(first), parse_period_label(last)
