@@ -86,17 +86,22 @@ def _estimates(exhaustive: bool) -> pd.DataFrame:
 
 @pytest.mark.parametrize(
     ("exhaustive", "expected"),
-    [(True, "exact"), (False, "simulation error")],
+    [(True, "no simulation error"), (False, "carries simulation error")],
 )
 def test_the_bootstrap_claim_follows_the_run(
     exhaustive: bool, expected: str, tmp_path: Path
 ) -> None:
-    """The paper says its p-value is exact; that has to come from the run.
+    """What the bootstrap achieved has to come from the run that achieved it.
 
     Whether the sign space was enumerated depends on how many clusters survive
-    the merges, which is a property of the data and not of the method. Asserting
-    exactness in prose would let a change in the panel silently falsify the
-    sentence, so the sentence is emitted here.
+    the merges, which is a property of the data and not of the method, so the
+    sentence is emitted rather than written.
+
+    The claim itself is bounded deliberately. Enumeration removes simulation
+    error; it does not make the test exact, because the sign-flip distribution
+    approximates the null rather than being it. An earlier version of this test
+    asserted the word "exact" and so defended a claim the inference module's own
+    docstring rejects.
     """
     written = _macros(write_identification_macros(_estimates(exhaustive), 3, 1, tmp_path / "i.tex"))
     assert written["BootstrapClusters"] == "9"

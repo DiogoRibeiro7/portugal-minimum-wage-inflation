@@ -415,8 +415,14 @@ def write_identification_macros(
         # depends on whether the sign space was enumerated, which depends on the
         # cluster count in the sample that survived the merges. Asserting it in
         # prose would let a change in the panel silently falsify the sentence.
+        # "Exact" was wrong and this module was the only place asserting it.
+        # inference.py says so in its own docstring: enumerating the sign space
+        # removes the Monte Carlo component of the error and nothing else, since
+        # the sign-flip distribution approximates the null rather than being it.
+        # A test was pinning the wrong word, so the suite defended the error.
         "BootstrapBasis": (
-            r"enumerates the entire space of sign vectors, so its $p$-value is exact"
+            r"enumerates the complete Rademacher sign space, so its $p$-value "
+            r"carries no simulation error"
             if bool(ordered["bootstrap_exhaustive"].all())
             else r"samples the sign space, so its $p$-value carries simulation error"
         ),

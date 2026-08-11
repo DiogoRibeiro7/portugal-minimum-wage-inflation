@@ -149,12 +149,20 @@ def build_regional_shock(
             which take the national wage rather than a carried-forward level.
 
     Returns:
-        Columns `nuts_code`, `month`, `minimum_wage`, `delta_log_minimum_wage`.
+        Columns `nuts_code`, `month`, `minimum_wage`, `delta_log_minimum_wage`,
+        and two more that keep the designs apart:
+        `delta_log_national_minimum_wage`, the common mainland change carried on
+        every region's rows, and `statutory_divergence`, the region's own change
+        net of it. The applicable change is the sum of the two, so a design that
+        wants only the national component no longer has to subtract anything,
+        and one that wants only the regional experiment has it isolated.
 
     Raises:
         PassThroughError: If the national series cannot be built.
     """
     national_wage = monthly_statutory_wage(wage_panel, months, geography=national)
+    national_change = pd.Series(np.log(national_wage.to_numpy(dtype=float)), index=months).diff()
+    national_change.iloc[0] = np.nan
 
     blocks = []
     for region in regions:
@@ -194,6 +202,18 @@ def build_regional_shock(
             boundary = np.zeros(len(months), dtype=bool)
             boundary[1:] = in_gap[1:] != in_gap[:-1]
             block.loc[boundary, "delta_log_minimum_wage"] = np.nan
+
+        # Carried on every region's rows so a shift-share design can multiply
+        # exposure by the common national change. Using the *applicable*
+        # regional change there would fold Madeira's own statutory variation
+        # into a regressor meant to carry only composition, mixing two
+        # identification strategies in one coefficient: with exposure as flat as
+        # it is, the regional component could dominate the estimate while the
+        # manuscript described a national shock.
+        block["delta_log_national_minimum_wage"] = national_change.to_numpy()
+        block["statutory_divergence"] = (
+            block["delta_log_minimum_wage"] - block["delta_log_national_minimum_wage"]
+        )
         blocks.append(block)
 
     return pd.concat(blocks, ignore_index=True)
@@ -445,11 +465,22 @@ def add_exposure_interaction(
     panel: pd.DataFrame,
     exposure: pd.DataFrame,
     *,
-    shock_column: str = "delta_log_minimum_wage",
+    shock_column: str = "delta_log_national_minimum_wage",
     exposure_column: str = "regional_bite_exposure",
     region_column: str = "region",
 ) -> pd.DataFrame:
-    """Interact the statutory change with each region's predetermined exposure.
+    """Interact the *national* statutory change with predetermined exposure.
+
+    The shock defaults to the common mainland change, not the applicable
+    regional one. That distinction is the whole design. Multiplying exposure by
+    the applicable change makes the regressor
+    :math:`(B_r-\\bar B)\\,\\Delta\\log MW_{rt}`, which carries Madeira's own
+    statutory variation alongside the composition it is supposed to isolate;
+    the manuscript describes :math:`(B_r-\\bar B)\\,\\Delta\\log MW^{PT}_t`.
+    Madeira's change differs from the mainland's in eight of the ten January
+    months in the estimation window, so the two are not interchangeable, and
+    with exposure as flat as it is the regional component can carry the
+    estimate while the paper reports it as a shift-share result.
 
     This is the design the literature favours, and it has one decisive advantage
     over the category-differential alternative: because exposure varies across

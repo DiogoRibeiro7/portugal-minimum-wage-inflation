@@ -773,14 +773,77 @@ def shift_share_exposure(
     measured["contribution"] = measured["covered"] * measured["minimum_wage_bite"]
 
     exposure = measured.groupby("region", as_index=False).agg(
-        regional_bite_exposure=("contribution", "sum"),
+        measured_exposure=("contribution", "sum"),
         covered_employment_share=("covered", "sum"),
     )
+
+    # Three distinct quantities, kept apart because they answer different
+    # questions and only one of them is what the design wants.
+    #
+    # `measured_exposure` is the minimum-wage bite as a share of *all* the
+    # region's employees: the sectors nobody surveyed contribute nothing to the
+    # numerator and still sit in the denominator.
+    #
+    # `regional_bite_exposure` divides that by coverage, giving the bite
+    # conditional on working in a surveyed sector. Reporting only this
+    # conditions the unsurveyed sectors away, and they are not distributed
+    # evenly: agriculture is unsurveyed and is a far larger share of employment
+    # in the Alentejo than in Lisbon, so dividing it out compresses precisely
+    # the regional differences the measure exists to capture.
+    #
+    # Neither is the unconditional probability that an employee earns the
+    # minimum wage, which is unobservable without an assumption about the
+    # unsurveyed sectors. :func:`bound_unmeasured_exposure` supplies that
+    # assumption explicitly instead of burying it in a normalisation.
     exposure["regional_bite_exposure"] = (
-        exposure["regional_bite_exposure"] / exposure["covered_employment_share"]
+        exposure["measured_exposure"] / exposure["covered_employment_share"]
     )
     exposure["exposure_definition"] = "shift_share_national_bite"
     return exposure.sort_values("region").reset_index(drop=True)
+
+
+def bound_unmeasured_exposure(
+    exposure: pd.DataFrame, incidence: float, *, label: str | None = None
+) -> pd.DataFrame:
+    """Complete the exposure measure under a stated bite for unsurveyed sectors.
+
+    The survey covers neither agriculture nor public administration, and their
+    weight differs sharply across regions. Two conventions are usually applied
+    silently: setting their bite to zero, which asserts that no agricultural
+    worker earns the minimum wage, or renormalising them away, which assumes
+    their bite equals the average of the sectors that were surveyed. Both are
+    assumptions, and neither is stated.
+
+    This makes the assumption a parameter. Sweeping it over a defensible range
+    is what turns "the spread is narrow" from a property of one normalisation
+    into a claim about the measure.
+
+    Args:
+        exposure: Output of :func:`shift_share_exposure`.
+        incidence: Assumed minimum-wage bite in the unsurveyed sectors, as a
+            proportion.
+        label: Name recorded in `exposure_definition`.
+
+    Returns:
+        A frame whose `regional_bite_exposure` is
+        ``measured_exposure + (1 - coverage) * incidence``, the unconditional
+        bite implied by that assumption.
+
+    Raises:
+        ExposureError: If the columns are absent or the incidence is not a
+            proportion.
+    """
+    _require_columns(
+        "exposure", exposure, frozenset({"measured_exposure", "covered_employment_share"})
+    )
+    if not 0.0 <= incidence <= 1.0:
+        raise ExposureError(f"incidence must be a proportion, got {incidence}")
+
+    bounded = exposure.copy()
+    uncovered = 1.0 - bounded["covered_employment_share"]
+    bounded["regional_bite_exposure"] = bounded["measured_exposure"] + uncovered * incidence
+    bounded["exposure_definition"] = label or f"unmeasured_bite_{incidence:.2f}"
+    return bounded
 
 
 def select_snapshot(registry: dict[str, Any], period: str | None = None) -> dict[str, Any]:

@@ -162,21 +162,45 @@ everything moving national prices in a month --- energy, taxes, the pandemic ---
 is absorbed rather than left in the error. It is the specification the
 literature favours, and here it is correctly identified.
 
-It supports nothing whatever. Not one of the \ExposureHorizons{} horizons is
-significant at five per cent even by conventional clustered inference, whose
-smallest $p$-value is \ExposureMinClusteredP{}; the bootstrap and the Holm
-correction have nothing left to reject. This is a stronger negative than the
-regional policy design produced. There, conventional inference over-rejected and
-the bootstrap had to be brought in to correct it. Here the design is so
-uninformative that inference known to over-reject cannot manufacture a single
-false positive, and the coefficients wander as far as
+It rejects nothing. Not one of the \ExposureHorizons{} horizons is significant
+at five per cent even by conventional clustered inference, whose smallest
+$p$-value is \ExposureMinClusteredP{}; the bootstrap and the Holm correction
+have nothing left to reject. Inference known to over-reject cannot manufacture a
+single false positive here, and the coefficients wander as far as
 \ExposureWidestCoefficient{} at \ExposureWidestHorizon{}~months without
 approaching significance.
 
-The constraint is therefore not a missing dataset. It is that the Portuguese
-minimum wage binds at broadly similar rates across most of the economy, so
-industry mix is a weak instrument for exposure to it. Publishing the bite by
-region would change this; publishing more of the same national bite would not.
+Two qualifications keep this from being read as more than it is, and both
+weaken it.
+
+The exposure measure is conditional on the sectors the survey covers. Coverage
+runs from \ExposureCoverageMinPct{} to \ExposureCoverageMaxPct{}~per cent of a
+region's employees, and the uncovered part is not spread evenly: agriculture is
+unsurveyed and is a far larger share of employment in the Alentejo than around
+Lisbon. Dividing it out therefore compresses exactly the regional differences
+the measure exists to capture. Completing the measure under an assumed bite $u$
+for the unsurveyed sectors, rather than conditioning them away, widens the
+spread substantially --- at $u=0$ it is roughly seventy per cent wider than the
+conditional figure --- though it stays within a few percentage points across
+every assumption we regard as defensible. The regional \emph{ranking}, however,
+is not stable across those assumptions, so we do not report one.
+
+Nor does failing to reject establish that the effect is zero. What a null is
+worth depends on what the design could have detected. For a ten per cent
+statutory rise, the difference in price response between the most and least
+exposed region is resolved to about four tenths of a percentage point at the
+horizons where the estimate is tightest, which would be informative; but at six
+and eighteen months the interval spans more than three percentage points, which
+is wider than any pass-through estimate in this literature. At those horizons
+the finding is not that there is no response. It is that this design cannot see
+one.
+
+What can be said is narrower than "exposure is flat in Portugal". It is that
+minimum-wage incidence within the sectors where a comparable bite is observed
+varies little once weighted by regional industrial composition, and that the
+resulting design is under-powered at most horizons. Publishing the bite by
+region would address both; publishing more of the same national bite would
+address neither.
 
 \subsection{The category-differential design, and why it also falls short}
 
