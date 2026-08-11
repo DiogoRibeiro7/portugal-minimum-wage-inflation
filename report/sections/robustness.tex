@@ -170,8 +170,34 @@ single false positive here, and the coefficients wander as far as
 \ExposureWidestCoefficient{} at \ExposureWidestHorizon{}~months without
 approaching significance.
 
-Two qualifications keep this from being read as more than it is, and both
-weaken it.
+The null does not depend on the choices we made in building the measure.
+Table~\ref{tab:exposure-robustness} re-estimates it varying the survey round the
+bite is taken from, the year composition is frozen at, the bite assumed for the
+sectors the survey misses, and which region is dropped. No horizon in any of the
+sixteen specifications survives the Holm correction, and none rejects at five
+per cent before it.
+
+\begin{table}[htbp]
+  \centering
+  \caption{The exposure design under alternative construction choices.
+  Coefficient range is across horizons within a specification; rejections are at
+  five per cent, before and after the Holm correction across the horizon family.}
+  \label{tab:exposure-robustness}
+  \input{tables/exposure_robustness}
+\end{table}
+
+The coefficients themselves tell the more useful story. They range from
+$-2.36$ to $0.49$ in the baseline and from $-9.89$ to $0.47$ when Grande Lisboa
+is dropped. Grande Lisboa is the least exposed region by a clear margin, so
+removing it collapses most of the contrast the design runs on, and the estimate
+moves by an order of magnitude in response. A coefficient that behaves that way
+is not measuring a price response; it is dividing by a number close to zero.
+That the null survives every specification is therefore not evidence that
+pass-through is absent. It is evidence that this design would fail to detect it
+either way.
+
+Two further qualifications keep the exposure measure from being read as more
+than it is, and both weaken it.
 
 The exposure measure is conditional on the sectors the survey covers. Coverage
 runs from \ExposureCoverageMinPct{} to \ExposureCoverageMaxPct{}~per cent of a

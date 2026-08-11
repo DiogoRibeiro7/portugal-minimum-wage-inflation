@@ -471,3 +471,59 @@ def detectable_effects(
         )
         for horizon, coefficient, error in zip(horizons, coefficients, errors, strict=True)
     ]
+
+
+@dataclass(frozen=True)
+class RobustnessRun:
+    """One specification of a design, and what it found.
+
+    Attributes:
+        label: What was varied.
+        horizons: Number of horizons estimated.
+        min_coefficient: Smallest coefficient across horizons.
+        max_coefficient: Largest coefficient across horizons.
+        rejections: Horizons significant at five per cent by the bootstrap.
+        rejections_holm: Horizons surviving the Holm correction.
+    """
+
+    label: str
+    horizons: int
+    min_coefficient: float
+    max_coefficient: float
+    rejections: int
+    rejections_holm: int
+
+
+def summarise_run(label: str, estimates: pd.DataFrame) -> RobustnessRun:
+    """Reduce one estimated specification to what a robustness table needs.
+
+    A null that holds in the specification its author chose, and nowhere else,
+    is not a finding. Reducing every variant to the same few numbers is what
+    makes the comparison possible without reproducing seven horizons for each.
+
+    Args:
+        label: What this specification varied.
+        estimates: Horizon estimates.
+
+    Returns:
+        The summary.
+
+    Raises:
+        ValueError: If there are no estimates to summarise.
+    """
+    if estimates.empty:
+        raise ValueError(f"{label}: no estimates to summarise")
+
+    holm = (
+        int((estimates["p_value_bootstrap_holm"] < 0.05).sum())
+        if "p_value_bootstrap_holm" in estimates
+        else 0
+    )
+    return RobustnessRun(
+        label=label,
+        horizons=len(estimates),
+        min_coefficient=float(estimates["coefficient"].min()),
+        max_coefficient=float(estimates["coefficient"].max()),
+        rejections=int((estimates["p_value_bootstrap"] < 0.05).sum()),
+        rejections_holm=holm,
+    )

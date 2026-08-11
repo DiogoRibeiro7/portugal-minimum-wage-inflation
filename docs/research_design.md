@@ -4,7 +4,7 @@
 
 Document the long-run relationship between Portugal's statutory minimum wage,
 consumer prices and labour productivity from the introduction of the wage floor
-in 1974, on a basis reconstructed from primary law; and establish what the
+in 1974, on a basis traceable to the acts that set it; and establish what the
 available regional variation can and cannot identify about the price
 pass-through of minimum-wage policy.
 
@@ -62,11 +62,15 @@ paper now makes the second.
 
 ## Contribution architecture
 
-### Contribution 1: the statutory series, from primary law
+### Contribution 1: the statutory series, traceable to the acts
 
-A reproducible statutory minimum-wage series covering 1974 to the present, with
-every value read from the act that set it, retrieved from the Diário da
-República by permanent identifier. It carries features that secondary
+A reproducible statutory minimum-wage series covering 1974 to the present. The
+national series is parsed from the labour ministry's register and reconciled
+against both the increases that register states and Eurostat's independent
+compilation; the acts the register omits, and both regional schedules, are
+retrieved from the Diário da República by permanent identifier and read for the
+values they set. Describing the whole series as "read from the acts themselves"
+would overstate it: the national baseline is the register, verified. It carries features that secondary
 compilations flatten:
 
 - three legally distinct minimum wages coexisted until 1991 and two until 2004,

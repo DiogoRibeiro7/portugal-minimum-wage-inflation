@@ -52,6 +52,7 @@ paper:
 	poetry run ptmw analyse macro
 	poetry run ptmw analyse pass-through
 	poetry run ptmw analyse exposure-design
+	poetry run ptmw analyse exposure-robustness
 	# LaTeX resolves citations and cross-references across passes, and bibtex
 	# runs between them. A single pass leaves the bibliography empty and every
 	# citation unresolved, which is how the references silently went missing.

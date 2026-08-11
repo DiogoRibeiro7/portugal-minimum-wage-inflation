@@ -10,7 +10,7 @@ import pandas as pd
 import typer
 import yaml
 
-from pt_mw_inflation.analysis.inference import detectable_effects
+from pt_mw_inflation.analysis.inference import detectable_effects, summarise_run
 from pt_mw_inflation.analysis.local_projections import estimate_panel_local_projections
 from pt_mw_inflation.analysis.outputs import (
     generate_macro_outputs,
@@ -19,6 +19,7 @@ from pt_mw_inflation.analysis.outputs import (
     write_identification_macros,
     write_regional_design_table,
     write_regional_premium_macros,
+    write_robustness_table,
     write_seasonality_macros,
 )
 from pt_mw_inflation.data.ameco import fetch_series as fetch_ameco_series
@@ -40,6 +41,7 @@ from pt_mw_inflation.processing.exposure import (
     ExposureError,
     PredeterminationError,
     activity_bite_from_registry,
+    bound_unmeasured_exposure,
     check_predetermined,
     measure_variation_strength,
     select_snapshot,
@@ -591,6 +593,100 @@ def analyse_exposure_design(
         f"  significant at 5%: {int((estimates['p_value_clustered'] < 0.05).sum())} by clustered "
         f"inference, {int((estimates['p_value_bootstrap'] < 0.05).sum())} by the bootstrap, "
         f"{survivors} after Holm"
+    )
+
+
+@analyse_app.command("exposure-robustness")
+def analyse_exposure_robustness(
+    prices: Path = typer.Option(
+        Path("data/processed/regional_price_panel.parquet"), help="Regional price panel."
+    ),
+    wages: Path = typer.Option(
+        Path("data/processed/minimum_wage_policy.parquet"), help="Statutory panel."
+    ),
+    regional: Path = typer.Option(
+        Path("data/processed/regional_employment.parquet"), help="Regional employment."
+    ),
+    national: Path = typer.Option(
+        Path("data/processed/national_employment.parquet"), help="National employment."
+    ),
+    start: str = typer.Option("2016-01", help="First month of the baseline window."),
+) -> None:
+    """Re-estimate the exposure design under every discretionary choice.
+
+    A null that holds in the specification its author picked, and nowhere else,
+    is not a finding. This varies the survey round the bite comes from, the year
+    composition is frozen at, the assumed bite in the sectors the survey misses,
+    and which region is dropped, and reports what each yields.
+    """
+    root = _repo_root()
+    for path in (prices, wages, regional, national):
+        if not (root / path).exists():
+            raise typer.BadParameter(f"{path} not found; build it first")
+
+    settings = _load_settings(root)
+    horizons = list(settings["pass_through"]["horizons_months"])
+
+    acts = yaml.safe_load((root / "config/legal_acts.yaml").read_text(encoding="utf-8"))
+    gaps = {
+        block["geography"]: frozenset(block.get("gap_years", []) or [])
+        for block in acts["regional"].values()
+    }
+    registry = yaml.safe_load((root / "config/minimum_wage_bite.yaml").read_text(encoding="utf-8"))
+    regional_employment = pd.read_parquet(root / regional)
+    national_employment = pd.read_parquet(root / national)
+    price_panel = pd.read_parquet(root / prices)
+    wage_panel = pd.read_parquet(root / wages).query("scope == 'general'")
+
+    def build(period: str, baseline: int) -> pd.DataFrame:
+        selected = select_snapshot(registry, period)
+        shares = industry_shares(regional_employment, year=baseline)
+        bite = activity_bite_from_registry(selected, national_employment)
+        return shift_share_exposure(shares, bite)
+
+    def estimate(exposure: pd.DataFrame, drop: str | None = None) -> pd.DataFrame:
+        panel = build_estimation_panel(price_panel, wage_panel, start=start, gap_years=gaps)
+        if drop is not None:
+            panel = panel.loc[panel["region"] != drop]
+        return estimate_panel_local_projections(
+            add_exposure_interaction(panel, exposure),
+            outcome="log_price",
+            shock="exposure_shock",
+            horizons=horizons,
+            cluster="region",
+        )
+
+    runs = []
+    baseline_exposure = build("2015-10", 2015)
+    runs.append(
+        summarise_run("baseline: 2015-10 bite, 2015 composition", estimate(baseline_exposure))
+    )
+
+    for period in sorted(registry.get("snapshots") or {}):
+        if period != "2015-10":
+            runs.append(summarise_run(f"bite from {period}", estimate(build(period, 2015))))
+
+    for baseline in (2013, 2014):
+        runs.append(
+            summarise_run(f"composition frozen at {baseline}", estimate(build("2015-10", baseline)))
+        )
+
+    for incidence in (0.0, 0.10, 0.21):
+        bounded = bound_unmeasured_exposure(baseline_exposure, incidence)
+        runs.append(summarise_run(f"unsurveyed bite u={incidence:.2f}", estimate(bounded)))
+
+    for region in sorted(baseline_exposure["region"]):
+        runs.append(summarise_run(f"leave out {region}", estimate(baseline_exposure, drop=region)))
+
+    write_robustness_table(runs, root / "report/tables/exposure_robustness.tex")
+
+    typer.echo(f"Estimated {len(runs)} specifications")
+    rejecting = [run for run in runs if run.rejections_holm]
+    typer.echo(f"  specifications where any horizon survives Holm: {len(rejecting)} of {len(runs)}")
+    widest = max(runs, key=lambda run: run.max_coefficient - run.min_coefficient)
+    typer.echo(
+        f"  widest coefficient range: {widest.label} "
+        f"[{widest.min_coefficient:.2f}, {widest.max_coefficient:.2f}]"
     )
 
 
