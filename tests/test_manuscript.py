@@ -267,6 +267,7 @@ _ARTEFACT_PRODUCER = {
     "tables/exposure_macros": "ptmw build regional-exposure",
     "tables/exposure_design": "ptmw analyse exposure-design",
     "tables/exposure_design_macros": "ptmw analyse exposure-design",
+    "tables/exposure_robustness": "ptmw analyse exposure-robustness",
 }
 
 _INPUT = re.compile(r"\\input\{(tables/[a-z_]+)\}")

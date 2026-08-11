@@ -18,9 +18,12 @@ authors:
 repository-code: 'https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation'
 abstract: >-
   Reproducible study of Portugal's statutory minimum wage from its introduction
-  in May 1974 to 2026, assembled from primary law. The statutory series is read
-  from the acts themselves and includes the regional schedules of Madeira and
-  the Azores. Combined with a consumer price index and a productivity series
+  in May 1974 to 2026. The national series is parsed from the labour ministry's
+  official register of acts and reconciled against both the increases that
+  register states and Eurostat's independent compilation; the acts the register
+  omits, and the regional schedules of Madeira and the Azores, are retrieved
+  from the Diário da República by permanent identifier and read for the values
+  they set. Combined with a consumer price index and a productivity series
   reaching back to the 1960s, it documents the long-run record: the real wage
   floor fell through the inflation of the late 1970s and early 1980s and did not
   regain its 1974 level for four decades, while output per worker more than

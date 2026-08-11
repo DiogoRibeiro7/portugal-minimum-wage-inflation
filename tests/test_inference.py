@@ -8,13 +8,16 @@ rather than checking that the functions return numbers.
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from pt_mw_inflation.analysis.inference import (
     _ClusterProjector,
     clustered_t_statistic,
+    detectable_effects,
     holm_adjusted,
     randomization_inference,
+    summarise_run,
     wild_cluster_bootstrap,
 )
 
@@ -199,3 +202,51 @@ def test_holm_rejects_an_empty_family() -> None:
     """Adjusting nothing is a caller error, not an empty result."""
     with pytest.raises(ValueError, match="no p-values"):
         holm_adjusted([])
+
+
+def test_a_run_summary_reports_what_survived_each_correction() -> None:
+    """A robustness table needs rejections before and after multiplicity."""
+    estimates = pd.DataFrame(
+        {
+            "horizon": [0, 1, 3],
+            "coefficient": [-2.36, 0.49, 0.15],
+            "p_value_bootstrap": [0.55, 0.03, 0.93],
+            "p_value_bootstrap_holm": [1.0, 0.09, 1.0],
+        }
+    )
+    run = summarise_run("baseline", estimates)
+
+    assert run.horizons == 3
+    assert (run.min_coefficient, run.max_coefficient) == pytest.approx((-2.36, 0.49))
+    # One horizon rejects raw; none survives the correction across the family.
+    assert (run.rejections, run.rejections_holm) == (1, 0)
+
+
+def test_summarising_nothing_is_an_error_not_an_empty_row() -> None:
+    """A specification that estimated nothing must not read as one that found nothing."""
+    with pytest.raises(ValueError, match="no estimates"):
+        summarise_run("empty", pd.DataFrame())
+
+
+def test_detectable_effects_scale_the_estimate_into_price_points() -> None:
+    """A null is only informative if the design could have seen something.
+
+    Reporting the coefficient beside the smallest response it could have
+    rejected a null against is what separates "no pass-through" from "this
+    cannot see pass-through".
+    """
+    estimates = pd.DataFrame({"horizon": [0], "coefficient": [0.5], "standard_error": [0.2]})
+    effect = detectable_effects(estimates, contrast=0.02, statutory_rise=0.10)[0]
+
+    # 0.5 x 0.02 x 0.10 = 0.001 in logs, a tenth of a percentage point.
+    assert effect.effect_pp == pytest.approx(0.1)
+    assert effect.lower_pp < effect.effect_pp < effect.upper_pp
+    # The design cannot resolve anything smaller than this, however small the p.
+    assert effect.minimum_detectable_pp == pytest.approx(100 * 0.02 * 0.10 * 2.802 * 0.2)
+
+
+def test_a_zero_exposure_contrast_is_refused() -> None:
+    """Scaling by a contrast of zero would report perfect precision."""
+    estimates = pd.DataFrame({"horizon": [0], "coefficient": [0.5], "standard_error": [0.2]})
+    with pytest.raises(ValueError, match="contrast must be positive"):
+        detectable_effects(estimates, contrast=0.0)
