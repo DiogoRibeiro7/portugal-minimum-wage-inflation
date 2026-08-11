@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -179,3 +181,51 @@ def test_empty_window_is_rejected() -> None:
     """A start date beyond the data is a configuration error."""
     with pytest.raises(PassThroughError, match="no price observations"):
         build_estimation_panel(_prices(), _wage_panel(), start="2100-01")
+
+
+def test_the_national_wage_is_a_floor_under_a_stale_regional_act() -> None:
+    """A region overtaken by the national wage takes the national wage.
+
+    Madeira legislates intermittently and its acts state a euro figure, so a
+    value can stand while the national wage rises past it: the 2017 act's 570
+    was still the region's own last figure in 2018, by which time the national
+    wage was 580. Carrying the regional level unconditionally would report a
+    wage no employer could lawfully pay, and would record the region as
+    diverging downwards in a year its premium had simply been extinguished.
+    """
+    months = pd.date_range("2017-01-01", "2018-12-01", freq="MS")
+    panel = pd.DataFrame(
+        [
+            {
+                "geography": "PT30",
+                "effective_date": date(2017, 1, 1),
+                "minimum_wage_monthly_eur": 570.0,
+            }
+        ]
+    )
+    national = pd.Series([557.0 if month.year == 2017 else 580.0 for month in months], index=months)
+
+    stepped = monthly_statutory_wage(panel, months, geography="PT30", fallback=national)
+
+    assert stepped.loc["2017-06-01"] == pytest.approx(570.0)
+    # Overtaken: the standing regional figure is below the national floor.
+    assert stepped.loc["2018-06-01"] == pytest.approx(580.0)
+    assert (stepped >= national).all()
+
+
+def test_a_regional_premium_above_the_floor_is_preserved() -> None:
+    """The floor must not flatten a region that genuinely pays more."""
+    months = pd.date_range("2019-01-01", "2019-06-01", freq="MS")
+    panel = pd.DataFrame(
+        [
+            {
+                "geography": "PT30",
+                "effective_date": date(2019, 1, 1),
+                "minimum_wage_monthly_eur": 615.0,
+            }
+        ]
+    )
+    national = pd.Series(600.0, index=months)
+
+    stepped = monthly_statutory_wage(panel, months, geography="PT30", fallback=national)
+    assert (stepped == 615.0).all()

@@ -15,6 +15,7 @@ from pt_mw_inflation.analysis.outputs import (
     write_exposure_macros,
     write_identification_macros,
     write_regional_design_table,
+    write_regional_premium_macros,
 )
 from pt_mw_inflation.data.ameco import fetch_series as fetch_ameco_series
 from pt_mw_inflation.data.ameco import to_frame as ameco_to_frame
@@ -402,7 +403,7 @@ def analyse_pass_through(
         help="Statutory panel from 'ptmw build minimum-wage'.",
     ),
     start: str = typer.Option(
-        "2023-01", help="First month; the window where the register is contiguous."
+        "2010-01", help="First month; the window where the register is contiguous."
     ),
 ) -> None:
     """Estimate the regional pass-through design and write its outputs.
@@ -433,6 +434,7 @@ def analyse_pass_through(
     shock = build_regional_shock(
         wage_panel, months, sorted(panel["nuts_code"].unique()), gap_years=gaps
     )
+    write_regional_premium_macros(wage_panel, root / "report/tables/premium_macros.tex")
     variation = count_identifying_events(shock, national="PT11")
 
     typer.echo(

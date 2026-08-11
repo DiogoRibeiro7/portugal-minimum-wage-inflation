@@ -14,21 +14,46 @@ what identifies a coefficient is the set of region-months in which the statutory
 change differs from the mainland's. Counting them is not the same as counting
 observations, and the difference is large.
 
-The Azores contribute one month. Their supplement is proportional, so
+The Azores contribute nothing. Their supplement is proportional, so
 $\Delta \log MW$ in the Azores equals $\Delta \log MW$ on the mainland exactly
 in every month after the supplement took effect; the region adds rows to the
-panel and not one degree of freedom. Madeira contributes one month per act.
-Over the estimation window, and after excluding the years for which Madeira
-legislated but the act is not yet in our register, \IdentifyingEvents{}
-region-months diverge, across \IdentifyingRegions{} region.
+panel and not one degree of freedom.
 
-We stress the direction of this problem. A gap in the register is not neutral:
-if a region legislated in a year whose act is missing, its wage appears frozen
-against a rising national one, which is indistinguishable from a deliberate
-freeze and enters the estimation as a policy shock that never happened. The
-pipeline therefore requires known-incomplete years to be declared, and marks the
-transitions into and out of them unestimable rather than treating them as
-observed changes.
+Madeira is more interesting, and the reason is a fact about its law rather than
+about our data. Madeira legislates a euro figure rather than a rule, which looks
+like independent variation, but until 2016 the figure was not independent: the
+preamble to Decreto Legislativo Regional n.º~18/2016/M states the regional
+policy as a \MadeiraRuleFactorPct{}~per cent supplement on the mainland amount,
+begun in 1987, and the acts obey it to the cent from \MadeiraRuleFirstYear{} to
+\MadeiraRuleLastYear{}: over those years Madeira's figure is the mainland's
+multiplied by that supplement, with nothing left over. Madeira was on the same
+kind of rule as the Azores, written out by hand year by year, and contributed no
+more timing than they did. After \MadeiraRuleLastYear{} the acts leave the rule
+and the premium widens, reaching \MadeiraPremiumEndPct{}~per cent by
+\MadeiraPremiumEndYear{}. Madeira's usable
+variation therefore begins in 2017, not in 1987, and no amount of further
+retrieval changes that.
+
+Two features of the law shape what is counted. A regional decree stays in force
+until another replaces it --- DLR~18/2016/M expressly revokes DLR~13/2014/M ---
+so a year without an act is a year the previous figure continued, not a year
+without a wage. And because Madeira states a figure rather than a rule, a
+standing figure can be overtaken: its 2017 act set 570 euros, which was still
+the region's own last word in 2018 when the national wage reached 580. The
+national wage is a floor, so 580 is what bound, and Madeira's premium was
+extinguished for a year without any regional act saying so. Both are read from
+the acts and neither is inferred from a summary table.
+
+Over the estimation window \IdentifyingEvents{} region-months diverge from the
+mainland, across \IdentifyingRegions{} region.
+
+A gap in the register would still not be neutral: if a region legislated in a
+year whose act is missing, its wage would appear frozen against a rising
+national one, which is indistinguishable from a deliberate freeze and enters the
+estimation as a policy shock that never happened. The pipeline therefore
+requires known-incomplete years to be declared and defers to the national wage
+in them. Madeira's acts are registered from 2010; the years before that are
+declared, and the window starts where the register is contiguous.
 
 \subsection{Why conventional inference cannot be trusted here}
 
@@ -55,17 +80,33 @@ and Table~\ref{tab:regional-design} shows it on the actual data.
 
 Conventional inference calls \ClusteredHighlySignificant{} of the
 \HorizonsEstimated{} horizons significant at the one-tenth of one per cent
-level. The bootstrap rejects none of them at five per cent: its smallest
-$p$-value is \MinBootstrapP{}. Had we reported only the third column, the paper
-would have claimed substantial pass-through of minimum-wage costs into consumer
-prices within months of implementation.
+level. The bootstrap leaves \BootstrapSurvivors{} of them standing, at
+$p =\ $\MinBootstrapP{}. Had we reported only the third column, the paper would
+have claimed substantial pass-through of minimum-wage costs into consumer prices
+at nearly every horizon.
 
-The magnitudes are the second reason to distrust them. The largest coefficient
-is \PeakCoefficient{} at \PeakHorizon{}~months, which would imply prices rising
-by more than the wage shock itself. An estimate identified by
-\IdentifyingEvents{} events in one small, remote, tourism-intensive region is
-picking up whatever else was happening in Madeira, and the bootstrap is
-detecting exactly that.
+That surviving horizon is not a result, and the reason is the same one that
+motivated the bootstrap. \HorizonsEstimated{} horizons of one series are a
+family of tests, not \HorizonsEstimated{} papers. Reporting the smallest of
+several $p$-values as though it stood alone rejects a true null far above its
+nominal size --- with seven tests at five per cent, the chance of at least one
+rejection approaches a third --- which is the error the bootstrap was introduced
+to correct, one level up. Holm's step-down adjustment across the horizon family
+controls it under arbitrary dependence between horizons, which is what the
+strong serial correlation of a price series requires. Adjusted, the smallest
+$p$-value is \MinBootstrapHolmP{} and \BootstrapSurvivorsHolm{} horizons
+survive.
+
+What has changed is the plausibility of the point estimates, not the strength of
+the evidence. The largest coefficient is now \PeakCoefficient{} at
+\PeakHorizon{}~month, where an earlier version of this design --- estimated on a
+window in which the register held three identifying events --- returned a peak
+above one, implying prices rising by more than the wage shock that caused them.
+The profile is now the shape a pass-through function ought to have: positive and
+modest on impact, decaying within the year. We still decline to interpret it. It
+is identified by \IdentifyingEvents{} events in a single small, remote,
+tourism-intensive region, so anything else moving Madeiran prices on those dates
+enters the coefficient with nothing to separate it out.
 
 \subsection{The exposure design, built, and why it is too flat}
 
@@ -125,9 +166,18 @@ whatever corrupts one category may be moving the others less visibly.
 
 \subsection{What would change the conclusion}
 
-Three things, in descending order of value. Registering Madeira's acts for
-2010--2018, 2021 and 2022, each from primary law, would roughly quadruple the
-identifying events, and is a retrieval problem rather than a measurement one.
+An earlier version of this section named registering Madeira's missing acts as
+the most valuable step available, and estimated that it would roughly quadruple
+the identifying events. It has since been done: the acts from 2010 onwards are
+registered from primary law, the identifying events rose from three to
+\IdentifyingEvents{}, and the estimates became far more plausible without
+becoming significant. We record the prediction and its outcome because the
+second half is the informative part. More identifying variation of the same kind
+improved the point estimates and did not change the conclusion, which is what
+one should expect when the binding constraint is that there is one treated
+region rather than that there are too few dates.
+
+That leaves two things, in descending order of value.
 Minimum-wage coverage published by NUTS~II region and economic activity jointly
 would remove the assumption the exposure measure rests on and, more importantly,
 could widen a spread that industry mix alone cannot. And a longer regional price

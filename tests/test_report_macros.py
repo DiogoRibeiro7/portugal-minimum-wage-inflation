@@ -79,6 +79,7 @@ def _estimates(exhaustive: bool) -> pd.DataFrame:
             "observations": [900, 900],
             "clusters": [9, 9],
             "bootstrap_exhaustive": [exhaustive, exhaustive],
+            "p_value_bootstrap_holm": [0.246, 0.196],
         }
     )
 

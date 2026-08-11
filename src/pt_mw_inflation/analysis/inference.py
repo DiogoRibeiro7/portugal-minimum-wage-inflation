@@ -27,6 +27,7 @@ is visible rather than hidden:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import product
 
@@ -346,3 +347,47 @@ def randomization_inference(
         draws=draws,
         exhaustive=False,
     )
+
+
+def holm_adjusted(p_values: Sequence[float]) -> list[float]:
+    """Adjust a family of p-values for multiplicity, by Holm's step-down rule.
+
+    A horizon profile is a family of tests, not one test. Estimating seven
+    horizons and reporting the smallest p-value as though it stood alone
+    rejects a true null far more often than its nominal size: at five per cent
+    across seven independent tests, the chance of at least one rejection is
+    about thirty per cent. In a design whose whole point is that conventional
+    inference over-rejects, quoting an uncorrected minimum would repeat the
+    error the bootstrap was introduced to fix, one level up.
+
+    Holm is used rather than Bonferroni because it is uniformly more powerful
+    and needs no more assumptions: both control the familywise error rate under
+    arbitrary dependence, which matters here because horizons of the same
+    series are strongly dependent.
+
+    Args:
+        p_values: One p-value per member of the family, in any order.
+
+    Returns:
+        Adjusted p-values in the order supplied, each capped at one and made
+        monotone in the original ranking, so a smaller raw value can never
+        adjust to a larger one.
+
+    Raises:
+        ValueError: If the family is empty.
+    """
+    values = list(p_values)
+    if not values:
+        raise ValueError("no p-values to adjust")
+
+    count = len(values)
+    order = sorted(range(count), key=lambda index: values[index])
+
+    adjusted = [0.0] * count
+    running = 0.0
+    for rank, index in enumerate(order):
+        # Enforced monotonicity is what makes the step-down rule coherent: once
+        # a hypothesis fails to be rejected, nothing ranked below it may be.
+        running = max(running, min(1.0, (count - rank) * values[index]))
+        adjusted[index] = running
+    return adjusted

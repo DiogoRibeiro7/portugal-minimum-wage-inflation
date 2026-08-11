@@ -22,7 +22,11 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from pt_mw_inflation.analysis.inference import clustered_t_statistic, wild_cluster_bootstrap
+from pt_mw_inflation.analysis.inference import (
+    clustered_t_statistic,
+    holm_adjusted,
+    wild_cluster_bootstrap,
+)
 
 FloatArray = npt.NDArray[np.float64]
 
@@ -166,7 +170,15 @@ def estimate_panel_local_projections(
             )
         )
 
-    return pd.DataFrame([asdict(estimate) for estimate in estimates])
+    frame = pd.DataFrame([asdict(estimate) for estimate in estimates])
+    if not frame.empty:
+        # The horizons are estimated together and reported together, so they are
+        # one family of tests. Adjusting here rather than at the reporting stage
+        # keeps the correction attached to the set it was computed over: a later
+        # caller that drops horizons would otherwise adjust for a family larger
+        # than the one it shows.
+        frame["p_value_bootstrap_holm"] = holm_adjusted(frame["p_value_bootstrap"].tolist())
+    return frame
 
 
 def _normal_two_sided(t_statistic: float) -> float:

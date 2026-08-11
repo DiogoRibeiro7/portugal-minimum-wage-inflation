@@ -13,6 +13,7 @@ import pytest
 from pt_mw_inflation.analysis.inference import (
     _ClusterProjector,
     clustered_t_statistic,
+    holm_adjusted,
     randomization_inference,
     wild_cluster_bootstrap,
 )
@@ -152,3 +153,49 @@ def test_randomization_requires_cluster_level_treatment() -> None:
     outcome = rng.normal(size=clusters.size)
     with pytest.raises(ValueError, match="constant within clusters"):
         randomization_inference(design, outcome, clusters, target=0, draws=10)
+
+
+def test_holm_leaves_a_single_test_untouched() -> None:
+    """A family of one has nothing to correct for."""
+    assert holm_adjusted([0.027]) == pytest.approx([0.027])
+
+
+def test_holm_scales_the_smallest_by_the_family_size() -> None:
+    """The most significant member is compared against the whole family.
+
+    This is the case the regional design turns on: one horizon of seven
+    rejects at five per cent, and reporting that p-value alone would treat
+    seven tests as though one had been run.
+    """
+    adjusted = holm_adjusted([0.238, 0.027, 0.301, 0.891, 0.500, 0.367, 0.352])
+    assert adjusted[1] == pytest.approx(7 * 0.027)
+    assert adjusted[1] > 0.05
+
+
+def test_holm_is_monotone_in_the_original_ranking() -> None:
+    """Once a hypothesis is not rejected, nothing ranked below it may be.
+
+    Without enforced monotonicity the step-down rule can return an adjusted
+    value smaller than one assigned to a more significant test, which reads as
+    the weaker result being the stronger one.
+    """
+    adjusted = holm_adjusted([0.01, 0.02, 0.03])
+    assert adjusted == sorted(adjusted)
+    assert all(0.0 <= value <= 1.0 for value in adjusted)
+
+
+def test_holm_never_exceeds_one() -> None:
+    """Scaling a large p-value by the family size must not leave probability."""
+    assert max(holm_adjusted([0.4, 0.5, 0.9])) == pytest.approx(1.0)
+
+
+def test_holm_is_at_least_as_large_as_the_raw_value() -> None:
+    """A correction that could shrink a p-value would not be a correction."""
+    raw = [0.001, 0.2, 0.049, 0.6]
+    assert all(a >= r for a, r in zip(holm_adjusted(raw), raw, strict=True))
+
+
+def test_holm_rejects_an_empty_family() -> None:
+    """Adjusting nothing is a caller error, not an empty result."""
+    with pytest.raises(ValueError, match="no p-values"):
+        holm_adjusted([])

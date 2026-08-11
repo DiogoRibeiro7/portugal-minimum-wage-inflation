@@ -135,11 +135,25 @@ def eli_url(
     )
 
 
+#: A word split across a line by the typesetter, once the line break has become
+#: a space. Requiring a letter on both sides is what keeps it from touching the
+#: real hyphens these acts contain: ``Decreto -Lei`` and ``254 -A/2015`` both
+#: carry a space *before* the hyphen, not after.
+_SOFT_HYPHEN = re.compile(r"(?<=[A-Za-z])- (?=[a-z])")
+
+
 def _normalise(text: str) -> str:
-    """Strip accents and collapse whitespace, for robust phrase matching."""
+    """Strip accents, rejoin split words, and collapse whitespace.
+
+    Rejoining matters more than it looks. These acts are read from the gazette's
+    own typesetting, which hyphenates freely, so ``retribuicao minima`` may
+    reach us as ``retribuicao mi- nima``. A phrase search then fails to match
+    with no sign that anything went wrong: the act is retrieved, the text is
+    present, and the extractor reports that the act sets no wage.
+    """
     decomposed = unicodedata.normalize("NFKD", text)
     stripped = "".join(char for char in decomposed if not unicodedata.combining(char))
-    return " ".join(stripped.split())
+    return _SOFT_HYPHEN.sub("", " ".join(stripped.split()))
 
 
 def parse_amounts(text: str) -> list[tuple[Decimal, Literal["PTE", "EUR"]]]:
@@ -249,6 +263,13 @@ def extract_minimum_wage(act: LegalAct) -> tuple[Decimal, Literal["PTE", "EUR"]]
     # amount in the document is frequently a page number or a reference to the
     # act being replaced.
     markers = (
+        # Madeira states the wage as the national figure "increased by a regional
+        # supplement", naming itself in the same clause. The construction is the
+        # region's own and appears in every one of its decrees back to 2010, so
+        # it is anchored first: it is the most specific wording available, and
+        # unlike the generic markers below it cannot match a neighbouring act on
+        # the same gazette page.
+        "acrescido de complemento regional, e, na regiao autonoma da madeira, de",
         "valor da retribuicao minima mensal garantida para vigorar",
         "retribuicao minima mensal garantida e de",
         "passam a ser de",

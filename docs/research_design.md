@@ -45,9 +45,12 @@ that conflicts with it.
   0.027, which identifies a regional effect in principle and nothing in
   practice; and the published bite post-dates the 2015 policy restart, so it is
   not predetermined for the episode with the most policy variation.
-- Regional *policy* variation exists but is thin: three identifying
-  region-months in one region, which conventional inference calls significant at
-  six horizons and the bootstrap at none.
+- Regional *policy* variation exists but is thin: ten identifying region-months
+  in one region. Conventional inference calls five horizons significant, the
+  bootstrap leaves one, and Holm's correction across the seven-horizon family
+  leaves none. The binding constraint is that there is one treated region, not
+  that there are too few dates --- which is why recovering Madeira's missing
+  acts improved the point estimates without changing the conclusion.
 
 The net objective is unchanged, but the reason for it is different from the one
 stated when it was written. The causal layer fails because the variation is too
@@ -93,7 +96,12 @@ the availability of data, and every part of it is measured rather than asserted:
 - the Azorean supplement is proportional, so in logs the Azorean statutory
   change equals the mainland's in every month after it took effect, and the
   region contributes no independent timing;
-- Madeira is the only source of genuine divergence;
+- Madeira is the only source of genuine divergence, and only from 2017. Until
+  2016 its legislated figures follow a two per cent rule on the mainland amount,
+  stated in the preamble to DLR 18/2016/M and obeyed to the cent, so Madeira was
+  on the same kind of rule as the Azores and contributed no independent timing
+  either. This is checked arithmetically on the statutory panel rather than
+  asserted, and emitted as a macro;
 - the shift-share exposure measure that would substitute for policy variation is
   built and reported, and spans 1.94 percentage points across nine regions,
   which is too flat to identify a price response; the constraint is that the
