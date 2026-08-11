@@ -217,7 +217,12 @@ Mitigation:
 ## Falsification tests
 
 - Leads of the statutory shock must not predict pre-treatment inflation.
-- Low-exposure CPI categories should show materially smaller responses.
+- Low-exposure CPI categories should show materially smaller responses. Note
+  that this test is not currently available: 94 per cent of statutory log change
+  falls in January, so the shock is nearly a January indicator, and the category
+  ranking measures each category's own January seasonal rather than its response.
+  Clothing falls 15.9 per cent in an average January on winter sales, which is
+  why its coefficient looked broken; nothing is wrong with the series.
 - A fake implementation month should not generate the same event profile.
 - Future minimum-wage increases should not predict current prices after controls.
 - Results should not be driven solely by hospitality or one region.

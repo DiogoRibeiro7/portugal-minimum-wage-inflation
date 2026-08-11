@@ -158,11 +158,34 @@ entirely. It therefore identifies each category relative to the others and is
 exposed to anything else moving national prices at the same time. The estimated
 ranking is partly plausible: food and, next, restaurants and accommodation sit
 at the top, and accommodation and food services is the activity with by far the
-highest measured minimum-wage coverage. But clothing and footwear returns a
-large negative coefficient that survives category-specific linear trends, which
-points to a break or a rebasing in that series rather than to any price
-response. Until that is diagnosed the ranking is not reportable, because
-whatever corrupts one category may be moving the others less visibly.
+highest measured minimum-wage coverage. But \SeasonalWorstCategory{} returns a
+coefficient an order of magnitude more negative than any other category's, and
+diagnosing it defeats the design.
+
+An earlier version of this paper put that coefficient down to a break or a
+rebasing in the series. That was wrong, and the true explanation is a property
+of the policy rather than of the data. Portugal moves its minimum wage on
+1~January: \ShockModalSharePct{}~per cent of all statutory log change over the
+sample falls in \ShockModalMonth{}, so the shock is very nearly an indicator for
+that one month. \SeasonalWorstCategory{} falls by \SeasonalWorstSwingPct{}~per
+cent in an average \ShockModalMonth{}, because winter sales enter the index and
+have done so more sharply since the harmonised treatment of seasonal products
+took effect in 2011. No other division moves by as much as a point. A
+specification with no month-of-year effects therefore reads the January sales
+cycle as the price response to the January wage rise, and it is the size of the
+sales cycle, not any defect in the series, that makes the coefficient extreme.
+Category-specific linear trends do not help, because the confound is seasonal
+and not a trend.
+
+Absorbing month-of-year effects removes the artefact and takes the design with
+it. Only \ShockSurvivingSharePct{}~per cent of the shock's variation survives
+those effects, because most of the shock \emph{is} the calendar. What remains is
+the handful of years whose January increase differed in size from the others,
+plus the single mid-year change of October 2014. We therefore do not report the
+category ranking, and the reason is not that one series is corrupt but that a
+policy which always moves in the same month cannot be separated from that month
+without discarding the variation that identifies it. The point generalises to
+any country that updates its wage floor on a fixed calendar date.
 
 \subsection{What would change the conclusion}
 

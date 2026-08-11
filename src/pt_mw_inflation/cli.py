@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import typer
 import yaml
@@ -16,6 +17,7 @@ from pt_mw_inflation.analysis.outputs import (
     write_identification_macros,
     write_regional_design_table,
     write_regional_premium_macros,
+    write_seasonality_macros,
 )
 from pt_mw_inflation.data.ameco import fetch_series as fetch_ameco_series
 from pt_mw_inflation.data.ameco import to_frame as ameco_to_frame
@@ -54,6 +56,8 @@ from pt_mw_inflation.processing.pass_through import (
     build_estimation_panel,
     build_regional_shock,
     count_identifying_events,
+    diagnose_seasonal_confound,
+    monthly_statutory_wage,
 )
 from pt_mw_inflation.processing.regional import (
     build_regional_panel,
@@ -435,6 +439,18 @@ def analyse_pass_through(
         wage_panel, months, sorted(panel["nuts_code"].unique()), gap_years=gaps
     )
     write_regional_premium_macros(wage_panel, root / "report/tables/premium_macros.tex")
+
+    # The category design carries no calendar-time effects, so a shock that
+    # always lands in the same month is confounded with that month. Diagnosed
+    # here rather than described in the prose, because it is arithmetic.
+    national_wage = monthly_statutory_wage(wage_panel, months, geography="PT")
+    confound = diagnose_seasonal_confound(price_panel, np.log(national_wage))
+    write_seasonality_macros(confound, root / "report/tables/seasonality_macros.tex")
+    typer.echo(
+        f"  {confound.modal_share:.0%} of statutory change lands in month "
+        f"{confound.modal_month}; {confound.surviving_variance_share:.0%} of it "
+        "survives month-of-year effects"
+    )
     variation = count_identifying_events(shock, national="PT11")
 
     typer.echo(

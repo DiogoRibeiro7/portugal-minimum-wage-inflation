@@ -326,3 +326,107 @@ def add_category_interactions(
         frame[column] = frame[shock_column] * (frame["category_code"] == category).astype(float)
         names.append(column)
     return frame, names
+
+
+@dataclass(frozen=True)
+class SeasonalConfound:
+    """How far a statutory shock is confounded with the calendar.
+
+    Attributes:
+        modal_month: Calendar month carrying most of the statutory change.
+        modal_share: Share of total log change falling in that month.
+        surviving_variance_share: Share of the shock's variance left once
+            month-of-year effects are absorbed. This is the variation any
+            seasonally-controlled estimate is actually identified from.
+        worst_category: Category whose own seasonal is largest in the modal
+            month, which is the category the confound distorts most.
+        worst_category_swing: That category's mean log change in the modal
+            month, in per cent.
+    """
+
+    modal_month: int
+    modal_share: float
+    surviving_variance_share: float
+    worst_category: str
+    worst_category_swing: float
+
+
+def diagnose_seasonal_confound(
+    prices: pd.DataFrame,
+    shock: pd.Series,
+    *,
+    category_column: str = "category_code",
+    month_column: str = "month",
+    price_column: str = "price_index",
+) -> SeasonalConfound:
+    """Measure how far the statutory shock is collinear with the calendar.
+
+    Portugal moves its minimum wage on 1 January in almost every year, so the
+    shock is nearly a January indicator. Any consumption category with a large
+    January seasonal is then attributed a response it did not have: clothing
+    falls sharply every January because winter sales enter the index, and a
+    specification without month-of-year effects reads that fall as the price
+    response to the wage rise that shares its date.
+
+    The diagnosis matters more than the correction. Absorbing month-of-year
+    effects removes the artefact but also removes most of the shock, because
+    most of the shock *is* the calendar. That is a property of the policy, not
+    of the data, and no amount of cleaning changes it.
+
+    Args:
+        prices: Long price panel with category, month and index columns.
+        shock: Log statutory wage indexed by month.
+        category_column: Column naming the consumption category.
+        month_column: Column holding the month.
+        price_column: Column holding the price index.
+
+    Returns:
+        The confound diagnostics.
+
+    Raises:
+        PassThroughError: If the shock never changes, or the panel and the
+            shock share no months.
+    """
+    frame = prices.copy()
+    frame[month_column] = pd.to_datetime(frame[month_column])
+    wide = frame.groupby([category_column, month_column])[price_column].mean().unstack(0)
+    if wide.empty:
+        raise PassThroughError("price panel carries no observations")
+
+    changes = pd.Series(shock).sort_index().diff().dropna()
+    changes.index = pd.DatetimeIndex(changes.index)
+    changes = changes.loc[changes.index.isin(wide.index)]
+    if changes.empty:
+        raise PassThroughError("the shock and the price panel share no months")
+
+    magnitude = changes.abs()
+    by_month = magnitude.groupby(pd.DatetimeIndex(changes.index).month).sum()
+    if float(by_month.sum()) == 0.0:
+        raise PassThroughError("the statutory shock never changes")
+
+    months = pd.DatetimeIndex(changes.index)
+    modal_month = int(by_month.idxmax())
+    modal_share = float(by_month.max() / by_month.sum())
+
+    # What a month-of-year specification would have left to work with. Regressing
+    # the shock on calendar-month indicators and keeping the residual is exactly
+    # what including those indicators does to it.
+    indicators = pd.get_dummies(months.month, drop_first=True, dtype=float).to_numpy()
+    design = np.column_stack([indicators, np.ones(len(changes))])
+    values = changes.to_numpy(dtype=float)
+    fitted = design @ np.linalg.lstsq(design, values, rcond=None)[0]
+    total = float(np.var(values))
+    surviving = float(np.var(values - fitted)) / total if total > 0 else 0.0
+
+    growth = pd.DataFrame(np.log(wide.to_numpy()), index=wide.index, columns=wide.columns).diff()
+    price_months = pd.DatetimeIndex(growth.index)
+    modal_swing = growth.loc[price_months.month == modal_month].mean()
+    worst = str(modal_swing.abs().idxmax())
+
+    return SeasonalConfound(
+        modal_month=modal_month,
+        modal_share=modal_share,
+        surviving_variance_share=surviving,
+        worst_category=worst,
+        worst_category_swing=100.0 * float(modal_swing[worst]),
+    )
