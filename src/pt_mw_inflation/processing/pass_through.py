@@ -430,3 +430,68 @@ def diagnose_seasonal_confound(
         worst_category=worst,
         worst_category_swing=100.0 * float(modal_swing[worst]),
     )
+
+
+def add_exposure_interaction(
+    panel: pd.DataFrame,
+    exposure: pd.DataFrame,
+    *,
+    shock_column: str = "delta_log_minimum_wage",
+    exposure_column: str = "regional_bite_exposure",
+    region_column: str = "region",
+) -> pd.DataFrame:
+    """Interact the statutory change with each region's predetermined exposure.
+
+    This is the design the literature favours, and it has one decisive advantage
+    over the category-differential alternative: because exposure varies across
+    regions, the interaction survives calendar-time fixed effects. Those effects
+    absorb everything moving national prices in a month --- energy, taxes, the
+    pandemic --- which the category design cannot do and is confounded by.
+
+    What it cannot do is manufacture variation. The interaction is the national
+    shock scaled by a regional constant, so its cross-sectional spread is the
+    spread of that constant, and no estimator recovers more information than the
+    exposure measure carries.
+
+    Args:
+        panel: Output of :func:`build_estimation_panel`.
+        exposure: Predetermined exposure by region.
+        shock_column: Column holding the log statutory change.
+        exposure_column: Column holding regional exposure.
+        region_column: Column identifying the region in the panel.
+
+    Returns:
+        The panel with `exposure_shock`, and the exposure it was built from.
+
+    Raises:
+        PassThroughError: If a column is missing, or no region matches, which is
+            what a NUTS coding mismatch between the two sources looks like.
+    """
+    for name, frame, columns in (
+        ("panel", panel, {shock_column, region_column}),
+        ("exposure", exposure, {exposure_column, "region"}),
+    ):
+        missing = columns.difference(frame.columns)
+        if missing:
+            raise PassThroughError(f"{name} missing columns: {sorted(missing)}")
+
+    merged = panel.merge(
+        exposure[["region", exposure_column]],
+        left_on=region_column,
+        right_on="region",
+        how="inner",
+        suffixes=("", "_exposure"),
+    )
+    if merged.empty:
+        raise PassThroughError(
+            "no region matches between the panel and the exposure measure; "
+            f"panel has {sorted(panel[region_column].unique())[:4]}..., "
+            f"exposure has {sorted(exposure['region'].unique())[:4]}..."
+        )
+
+    # Demeaned exposure, so the coefficient is the differential response of a
+    # region one unit more exposed than average rather than a level whose
+    # interpretation depends on where the exposure scale happens to sit.
+    centred = merged[exposure_column] - merged[exposure_column].mean()
+    merged["exposure_shock"] = centred * merged[shock_column]
+    return merged

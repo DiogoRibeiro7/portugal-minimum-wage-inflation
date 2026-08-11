@@ -13,6 +13,7 @@ import yaml
 from pt_mw_inflation.analysis.local_projections import estimate_panel_local_projections
 from pt_mw_inflation.analysis.outputs import (
     generate_macro_outputs,
+    write_exposure_design_macros,
     write_exposure_macros,
     write_identification_macros,
     write_regional_design_table,
@@ -35,10 +36,12 @@ from pt_mw_inflation.data.ine import fetch_regional_cpi
 from pt_mw_inflation.data.registry import download_registry
 from pt_mw_inflation.data.worldbank import fetch_indicator
 from pt_mw_inflation.processing.exposure import (
+    ExposureError,
     PredeterminationError,
     activity_bite_from_registry,
     check_predetermined,
     measure_variation_strength,
+    select_snapshot,
     shift_share_exposure,
 )
 from pt_mw_inflation.processing.macro import (
@@ -53,6 +56,8 @@ from pt_mw_inflation.processing.minimum_wage import (
     reconcile_annual_with_eurostat,
 )
 from pt_mw_inflation.processing.pass_through import (
+    PassThroughError,
+    add_exposure_interaction,
     build_estimation_panel,
     build_regional_shock,
     count_identifying_events,
@@ -170,6 +175,9 @@ def build_regional_exposure(
     first_shock_year: int = typer.Option(
         0, help="First year of the episode. When set, predetermination is enforced."
     ),
+    bite_period: str = typer.Option(
+        "", help="Survey round to take the bite from, as YYYY-MM. Defaults to the latest."
+    ),
     output: Path = typer.Option(
         Path("data/processed/regional_exposure.parquet"), help="Output Parquet path."
     ),
@@ -181,6 +189,11 @@ def build_regional_exposure(
             raise typer.BadParameter(f"{path} not found; run 'ptmw data regional-employment' first")
 
     registry = yaml.safe_load((root / "config/minimum_wage_bite.yaml").read_text(encoding="utf-8"))
+    try:
+        registry = select_snapshot(registry, bite_period or None)
+    except ExposureError as error:
+        raise typer.BadParameter(str(error)) from error
+
     if first_shock_year:
         # Refuses a bite or composition dated at or after the first shock, since
         # coverage measured after a rise is partly caused by it. Surfaced as a
@@ -216,6 +229,7 @@ def build_regional_exposure(
 
     typer.echo(f"Wrote exposure for {len(exposure)} regions to {output}")
     typer.echo(f"  composition and weights both count {population}, frozen at {baseline_year}")
+    typer.echo(f"  bite from the {registry['source']['reference_period']} survey round")
     covered = exposure["covered_employment_share"]
     typer.echo(f"  bite measured on {covered.min():.0%}-{covered.max():.0%} of regional employment")
 
@@ -495,3 +509,72 @@ def analyse_pass_through(
 
 if __name__ == "__main__":
     app()
+
+
+@analyse_app.command("exposure-design")
+def analyse_exposure_design(
+    prices: Path = typer.Option(
+        Path("data/processed/regional_price_panel.parquet"), help="Regional price panel."
+    ),
+    wages: Path = typer.Option(
+        Path("data/processed/minimum_wage_policy.parquet"), help="Statutory panel."
+    ),
+    exposure: Path = typer.Option(
+        Path("data/processed/regional_exposure.parquet"), help="Predetermined exposure."
+    ),
+    start: str = typer.Option("2016-01", help="First month; must follow the bite's survey round."),
+) -> None:
+    """Estimate the shift-share exposure design and write its table.
+
+    Reported so the design can be judged on an estimate rather than on the
+    spread of its regressor. Unlike the category design this one carries
+    calendar-time fixed effects, because exposure varies across regions, so
+    everything moving national prices in a month is absorbed.
+    """
+    root = _repo_root()
+    for path in (prices, wages, exposure):
+        if not (root / path).exists():
+            raise typer.BadParameter(f"{path} not found; build it first")
+
+    settings = _load_settings(root)
+    horizons = list(settings["pass_through"]["horizons_months"])
+
+    registry = yaml.safe_load((root / "config/legal_acts.yaml").read_text(encoding="utf-8"))
+    gaps = {
+        block["geography"]: frozenset(block.get("gap_years", []) or [])
+        for block in registry["regional"].values()
+    }
+
+    panel = build_estimation_panel(
+        pd.read_parquet(root / prices),
+        pd.read_parquet(root / wages).query("scope == 'general'"),
+        start=start,
+        gap_years=gaps,
+    )
+    try:
+        panel = add_exposure_interaction(panel, pd.read_parquet(root / exposure))
+    except PassThroughError as error:
+        raise typer.BadParameter(str(error)) from error
+
+    estimates = estimate_panel_local_projections(
+        panel,
+        outcome="log_price",
+        shock="exposure_shock",
+        horizons=horizons,
+        cluster="region",
+    )
+    if estimates.empty:
+        raise typer.BadParameter("no horizon could be estimated")
+
+    destination = root / "report/tables/exposure_design.tex"
+    write_regional_design_table(estimates, destination, command="ptmw analyse exposure-design")
+    write_exposure_design_macros(estimates, root / "report/tables/exposure_design_macros.tex")
+
+    typer.echo(f"Wrote {len(estimates)} horizon estimates to {destination.relative_to(root)}")
+    typer.echo(f"  window from {start}, {panel['region'].nunique()} regions")
+    survivors = int((estimates["p_value_bootstrap_holm"] < 0.05).sum())
+    typer.echo(
+        f"  significant at 5%: {int((estimates['p_value_clustered'] < 0.05).sum())} by clustered "
+        f"inference, {int((estimates['p_value_bootstrap'] < 0.05).sum())} by the bootstrap, "
+        f"{survivors} after Holm"
+    )

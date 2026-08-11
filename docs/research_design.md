@@ -40,11 +40,14 @@ that conflicts with it.
   is constructible and is constructed. The section *The region-by-industry
   exposure measure, revisited* corrects the earlier claim to the contrary, and
   the earlier claim is left in place, marked, rather than edited out.
-- The exposure design **is** blocked by two other things. The measure spans 1.94
-  percentage points across nine regions with a coefficient of variation of
-  0.027, which identifies a regional effect in principle and nothing in
-  practice; and the published bite post-dates the 2015 policy restart, so it is
-  not predetermined for the episode with the most policy variation.
+- The exposure design is **estimated**, not merely described. The published
+  table carries five survey rounds; the October 2015 round is predetermined for
+  every shock from 2016 onwards. Estimated on it, with calendar-time fixed
+  effects, not one of the seven horizons is significant at five per cent even by
+  conventional clustered inference, whose smallest p-value is 0.48. The measure
+  spans 2.49 percentage points across nine regions, coefficient of variation
+  0.035. That is a stronger negative than the policy design gave: inference
+  known to over-reject cannot manufacture even one false positive here.
 - Regional *policy* variation exists but is thin: ten identifying region-months
   in one region. Conventional inference calls five horizons significant, the
   bootstrap leaves one, and Holm's correction across the seven-horizon family

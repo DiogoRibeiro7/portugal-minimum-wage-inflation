@@ -45,9 +45,13 @@ paper:
 	poetry run ptmw data regional-employment
 	poetry run ptmw build minimum-wage
 	poetry run ptmw build macro
-	poetry run ptmw build regional-exposure
+	# The October 2015 round, and a window starting in 2016, so exposure
+	# precedes every shock it is used to estimate. The default round post-
+	# dates the window and the builder refuses it.
+	poetry run ptmw build regional-exposure --bite-period 2015-10 --first-shock-year 2016
 	poetry run ptmw analyse macro
 	poetry run ptmw analyse pass-through
+	poetry run ptmw analyse exposure-design
 	# LaTeX resolves citations and cross-references across passes, and bibtex
 	# runs between them. A single pass leaves the bibliography empty and every
 	# citation unresolved, which is how the references silently went missing.

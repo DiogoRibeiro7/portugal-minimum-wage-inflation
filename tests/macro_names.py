@@ -26,6 +26,7 @@ from pathlib import Path
 import pandas as pd
 
 from pt_mw_inflation.analysis.outputs import (
+    write_exposure_design_macros,
     write_exposure_macros,
     write_headline_macros,
     write_identification_macros,
@@ -123,6 +124,7 @@ def definable_macros(directory: Path) -> set[str]:
             directory / "exposure.tex",
         ),
         write_regional_premium_macros(_wage_panel(), directory / "premium.tex"),
+        write_exposure_design_macros(_estimates(), directory / "exposure_design.tex"),
         write_seasonality_macros(
             SeasonalConfound(
                 modal_month=1,

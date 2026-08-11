@@ -126,7 +126,7 @@ the mean of its sections weighted by national employment in them; taken
 unweighted the mean puts manufacturing on equal footing with a near-empty
 utilities sector, and reverses the regional ordering.
 
-Frozen on 2015 composition, exposure takes \ExposureDistinctValues{} distinct
+Frozen on 2015 composition and the October~2015 survey round, exposure takes \ExposureDistinctValues{} distinct
 values across the \ExposureRegions{} regions, running from \ExposureMinPct{} to
 \ExposureMaxPct{}~per cent. That is the whole difficulty. The high-low spread is
 \ExposureSpreadPP{}~percentage points and the coefficient of variation is
@@ -138,6 +138,40 @@ does not differ enough between industries for composition to translate that into
 in exposure. A measure that differs across regions establishes that a regional
 effect is identified in principle; it does not establish that the effect is
 identified precisely enough to be informative, and this spread does not.
+
+We can now do better than argue from the spread, because the published table
+reports five survey rounds rather than one. Its October~2015 round is
+predetermined for every statutory change from 2016 onwards, so the design can be
+estimated rather than merely described. Table~\ref{tab:exposure-design} reports
+it.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Cumulative price response to the statutory change interacted with
+  predetermined regional exposure. Exposure is frozen on 2015 composition and
+  the October~2015 survey round; the window begins in 2016, so exposure precedes
+  every shock. Region-category and calendar-time fixed effects, clustered on
+  region.}
+  \label{tab:exposure-design}
+  \input{tables/exposure_design}
+\end{table}
+
+This design has an advantage the previous two lack. Because exposure varies
+across regions, the interaction survives calendar-time fixed effects, so
+everything moving national prices in a month --- energy, taxes, the pandemic ---
+is absorbed rather than left in the error. It is the specification the
+literature favours, and here it is correctly identified.
+
+It supports nothing whatever. Not one of the \ExposureHorizons{} horizons is
+significant at five per cent even by conventional clustered inference, whose
+smallest $p$-value is \ExposureMinClusteredP{}; the bootstrap and the Holm
+correction have nothing left to reject. This is a stronger negative than the
+regional policy design produced. There, conventional inference over-rejected and
+the bootstrap had to be brought in to correct it. Here the design is so
+uninformative that inference known to over-reject cannot manufacture a single
+false positive, and the coefficients wander as far as
+\ExposureWidestCoefficient{} at \ExposureWidestHorizon{}~months without
+approaching significance.
 
 The constraint is therefore not a missing dataset. It is that the Portuguese
 minimum wage binds at broadly similar rates across most of the economy, so

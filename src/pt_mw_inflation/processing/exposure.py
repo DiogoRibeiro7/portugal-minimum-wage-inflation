@@ -781,3 +781,47 @@ def shift_share_exposure(
     )
     exposure["exposure_definition"] = "shift_share_national_bite"
     return exposure.sort_values("region").reset_index(drop=True)
+
+
+def select_snapshot(registry: dict[str, Any], period: str | None = None) -> dict[str, Any]:
+    """Return the registry with one measurement round selected.
+
+    The published table reports several survey rounds. Which one is used is an
+    identification decision, not a detail: only a round measured before the
+    first shock is predetermined, and the most recent round --- the natural
+    default --- is the one least likely to qualify.
+
+    Args:
+        registry: Parsed `config/minimum_wage_bite.yaml`.
+        period: Round to select, as `YYYY-MM`. The registry's own default round
+            is used when omitted.
+
+    Returns:
+        A registry whose `bite_by_activity` and `source.reference_period` are
+        those of the selected round. Every other key is carried through, so the
+        aggregation and coverage rules do not vary with the round.
+
+    Raises:
+        ExposureError: If the round is not recorded, or records no bite.
+    """
+    if period is None:
+        return registry
+
+    snapshots = registry.get("snapshots") or {}
+    if period not in snapshots:
+        available = sorted(snapshots) or ["none"]
+        raise ExposureError(f"no snapshot for {period}; available: {available}")
+
+    snapshot = snapshots[period]
+    bite = snapshot.get("bite_by_activity")
+    if not bite:
+        raise ExposureError(f"snapshot {period} records no bite_by_activity")
+
+    selected = dict(registry)
+    selected["bite_by_activity"] = bite
+    selected["source"] = {
+        **dict(registry.get("source") or {}),
+        "reference_period": period,
+        "national_total": snapshot.get("national_total"),
+    }
+    return selected

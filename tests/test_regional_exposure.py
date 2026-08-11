@@ -25,6 +25,7 @@ from pt_mw_inflation.processing.exposure import (
     check_predetermined,
     measure_variation_strength,
     require_regional_variation,
+    select_snapshot,
     shift_share_exposure,
 )
 
@@ -382,3 +383,50 @@ def test_a_frame_mixing_populations_within_itself_is_refused() -> None:
     regional.loc[regional.index[0], "population"] = "EMP"
     with pytest.raises(RegionalEmploymentError, match="mix populations"):
         require_matched_inputs(regional, national, baseline_year=2015)
+
+
+def test_selecting_a_snapshot_replaces_the_bite_and_its_date() -> None:
+    """Which survey round is used is an identification decision, not a detail."""
+    registry = {
+        **REGISTRY,
+        "snapshots": {
+            "2015-10": {"national_total": 21.1, "bite_by_activity": {"Tourism": 34.7}},
+        },
+    }
+    selected = select_snapshot(registry, "2015-10")
+
+    assert selected["bite_by_activity"] == {"Tourism": 34.7}
+    assert selected["source"]["reference_period"] == "2015-10"
+    # The aggregation and coverage rules must not vary with the round.
+    assert selected["nace_aggregates"] == REGISTRY["nace_aggregates"]
+
+
+def test_the_default_round_is_returned_unchanged() -> None:
+    """Omitting the round must not silently pick one."""
+    assert select_snapshot(REGISTRY) is REGISTRY
+
+
+def test_an_unrecorded_snapshot_is_refused_with_the_alternatives() -> None:
+    """A typo in a round must name what is available, not fail obscurely."""
+    registry = {**REGISTRY, "snapshots": {"2015-10": {"bite_by_activity": {"Tourism": 34.7}}}}
+    with pytest.raises(ExposureError, match=r"no snapshot for 2014-10; available: \['2015-10'\]"):
+        select_snapshot(registry, "2014-10")
+
+
+def test_an_earlier_snapshot_makes_the_measure_predetermined() -> None:
+    """This is the whole point of recording the earlier rounds.
+
+    The latest round post-dates every shock in the estimation window, so the
+    guard refuses it; an earlier round is admissible for later shocks and is
+    what allows the design to be estimated rather than only described.
+    """
+    registry = {
+        **REGISTRY,
+        "snapshots": {"2015-10": {"bite_by_activity": {"Tourism": 34.7}}},
+    }
+    with pytest.raises(PredeterminationError):
+        check_predetermined(registry, composition_year=2015, first_shock_year=2016)
+
+    check_predetermined(
+        select_snapshot(registry, "2015-10"), composition_year=2015, first_shock_year=2016
+    )
