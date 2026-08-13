@@ -11,12 +11,16 @@ import typer
 import yaml
 
 from pt_mw_inflation.analysis.inference import detectable_effects, summarise_run
-from pt_mw_inflation.analysis.local_projections import estimate_panel_local_projections
+from pt_mw_inflation.analysis.local_projections import (
+    assess_pre_trends,
+    estimate_panel_local_projections,
+)
 from pt_mw_inflation.analysis.outputs import (
     generate_macro_outputs,
     write_exposure_design_macros,
     write_exposure_macros,
     write_identification_macros,
+    write_pre_trend_macros,
     write_regional_design_table,
     write_regional_premium_macros,
     write_robustness_table,
@@ -468,6 +472,16 @@ def analyse_pass_through(
         f"{confound.modal_month}; {confound.surviving_variance_share:.0%} of it "
         "survives month-of-year effects"
     )
+    # Leads of the statutory change must not predict pre-treatment inflation.
+    # Tested jointly rather than lead by lead: reading them one at a time
+    # multiplies the chance one looks significant and misses a trend spread
+    # thinly across several.
+    pre_trend = assess_pre_trends(panel, outcome="log_price", shock="delta_log_minimum_wage")
+    write_pre_trend_macros(pre_trend, root / "report/tables/pre_trend_macros.tex")
+    typer.echo(
+        f"  joint pre-trend test on {pre_trend.restrictions} leads: p = {pre_trend.p_value:.3f}"
+    )
+
     variation = count_identifying_events(shock, national="PT11")
 
     typer.echo(

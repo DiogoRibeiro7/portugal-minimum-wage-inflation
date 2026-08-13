@@ -25,11 +25,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from pt_mw_inflation.analysis.inference import JointTest
 from pt_mw_inflation.analysis.outputs import (
     write_exposure_design_macros,
     write_exposure_macros,
     write_headline_macros,
     write_identification_macros,
+    write_pre_trend_macros,
     write_regional_premium_macros,
     write_seasonality_macros,
 )
@@ -125,6 +127,17 @@ def definable_macros(directory: Path) -> set[str]:
         ),
         write_regional_premium_macros(_wage_panel(), directory / "premium.tex"),
         write_exposure_design_macros(_estimates(), directory / "exposure_design.tex"),
+        write_pre_trend_macros(
+            JointTest(
+                statistic=7332.0,
+                p_value=0.109,
+                restrictions=5,
+                clusters=9,
+                draws=512,
+                exhaustive=True,
+            ),
+            directory / "pre_trend.tex",
+        ),
         write_seasonality_macros(
             SeasonalConfound(
                 modal_month=1,

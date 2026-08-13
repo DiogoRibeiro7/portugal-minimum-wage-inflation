@@ -527,3 +527,151 @@ def summarise_run(label: str, estimates: pd.DataFrame) -> RobustnessRun:
         rejections=int((estimates["p_value_bootstrap"] < 0.05).sum()),
         rejections_holm=holm,
     )
+
+
+@dataclass(frozen=True)
+class JointTest:
+    """A joint restriction that several coefficients are simultaneously zero.
+
+    Attributes:
+        statistic: Observed Wald statistic.
+        p_value: Bootstrap p-value for the joint null.
+        restrictions: How many coefficients were restricted.
+        clusters: Clusters the inference is based on.
+        draws: Sign vectors used.
+        exhaustive: Whether the sign space was enumerated rather than sampled.
+    """
+
+    statistic: float
+    p_value: float
+    restrictions: int
+    clusters: int
+    draws: int
+    exhaustive: bool
+
+
+def joint_wald_test(
+    design: FloatArray,
+    outcome: FloatArray,
+    clusters: npt.NDArray[np.int_],
+    *,
+    targets: Sequence[int],
+    draws: int = 9999,
+    seed: int = 20260811,
+) -> JointTest:
+    """Test that several coefficients are zero together, with few clusters.
+
+    A pre-trend diagnostic that inspects each lead separately answers the wrong
+    question twice over. It multiplies the chance that one lead looks
+    significant, and it cannot detect a trend that is spread thinly across
+    several leads without any single one standing out. The honest test is
+    whether the leads are jointly zero.
+
+    The asymptotic chi-squared reference is not usable here for the same reason
+    the t reference is not: it is justified in the number of clusters, and there
+    are nine. The null is therefore imposed and the Wald statistic is referred to
+    its own wild cluster bootstrap distribution.
+
+    Args:
+        design: Regressor matrix including fixed-effect dummies.
+        outcome: Dependent variable.
+        clusters: Integer cluster label per observation.
+        targets: Column indices restricted to zero under the null.
+        draws: Bootstrap draws when the sign space is too large to enumerate.
+        seed: Seed for reproducibility.
+
+    Returns:
+        The observed statistic with its bootstrap p-value.
+
+    Raises:
+        ValueError: If shapes disagree, fewer than two clusters are present, or
+            no restriction is supplied.
+    """
+    design = np.asarray(design, dtype=np.float64)
+    outcome = np.asarray(outcome, dtype=np.float64)
+    clusters = np.asarray(clusters)
+    selected = list(targets)
+
+    if not selected:
+        raise ValueError("at least one restriction is required")
+    if design.shape[0] != outcome.shape[0] or clusters.shape[0] != outcome.shape[0]:
+        raise ValueError("design, outcome and clusters must have the same number of rows")
+
+    unique, cluster_index = np.unique(clusters, return_inverse=True)
+    n_clusters = unique.size
+    if n_clusters < 2:
+        raise ValueError("at least two clusters are required")
+
+    # The design is fixed across draws and carries one dummy per region-category
+    # and per month, so it has thousands of columns. Two things make the naive
+    # loop infeasible and both are avoidable.
+    #
+    # Only the outcome changes, so the projection onto the coefficients is built
+    # once and each draw becomes a matrix-vector product.
+    #
+    # And the full sandwich would form a covariance the size of the design
+    # squared, when only the restricted block is needed. Writing
+    # $A^{-1}$ for the bread and $w_g = [A^{-1}]_S X_g^{\top} u_g$ for each
+    # cluster's contribution, the block is $\sum_g w_g w_g^{\top}$: a sum of
+    # outer products of length equal to the number of restrictions, never
+    # touching the large matrix.
+    n_obs, n_params = design.shape
+    gram = design.T @ design
+    try:
+        projector = np.linalg.solve(gram, design.T)
+    except np.linalg.LinAlgError as error:
+        raise ValueError("design is rank deficient; cannot form the projection") from error
+
+    projector_selected = projector[selected]
+    cluster_masks = [cluster_index == label for label in range(n_clusters)]
+    correction = (n_clusters / max(n_clusters - 1, 1)) * ((n_obs - 1) / max(n_obs - n_params, 1))
+
+    def wald(values: FloatArray) -> float:
+        beta = projector @ values
+        residuals = values - design @ beta
+
+        block = np.zeros((len(selected), len(selected)), dtype=np.float64)
+        for mask in cluster_masks:
+            scores = projector_selected[:, mask] @ residuals[mask]
+            block += np.outer(scores, scores)
+        block *= correction
+
+        restricted = beta[selected]
+        try:
+            solved = np.linalg.solve(block, restricted)
+        except np.linalg.LinAlgError:
+            return float("nan")
+        return float(restricted @ solved)
+
+    observed = wald(outcome)
+
+    # The null imposed by dropping the restricted columns, exactly as the
+    # single-coefficient bootstrap does. Resampling around an unrestricted fit
+    # would not have the same accuracy with this few clusters.
+    restricted_design = np.delete(design, selected, axis=1)
+    restricted_beta = _ols(restricted_design, outcome)
+    restricted_fit = restricted_design @ restricted_beta
+    restricted_residuals = outcome - restricted_fit
+
+    rng = np.random.default_rng(seed)
+    signs, exhaustive = _sign_vectors(n_clusters, draws, rng)
+
+    bootstrap = np.empty(signs.shape[0], dtype=np.float64)
+    for draw, sign_vector in enumerate(signs):
+        bootstrap[draw] = wald(restricted_fit + restricted_residuals * sign_vector[cluster_index])
+
+    finite = bootstrap[np.isfinite(bootstrap)]
+    if finite.size == 0 or not np.isfinite(observed):
+        p_value = float("nan")
+    else:
+        extreme = int(np.sum(finite >= observed))
+        p_value = extreme / finite.size if exhaustive else (extreme + 1) / (finite.size + 1)
+
+    return JointTest(
+        statistic=observed,
+        p_value=min(p_value, 1.0),
+        restrictions=len(selected),
+        clusters=n_clusters,
+        draws=int(signs.shape[0]),
+        exhaustive=exhaustive,
+    )

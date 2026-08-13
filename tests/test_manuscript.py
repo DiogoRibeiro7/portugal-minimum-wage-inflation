@@ -196,6 +196,7 @@ def test_every_writer_defines_something() -> None:
     }
     exercised = {
         "write_headline_macros",
+        "write_pre_trend_macros",
         "write_identification_macros",
         "write_exposure_macros",
         "write_exposure_design_macros",
@@ -268,6 +269,7 @@ _ARTEFACT_PRODUCER = {
     "tables/exposure_design": "ptmw analyse exposure-design",
     "tables/exposure_design_macros": "ptmw analyse exposure-design",
     "tables/exposure_robustness": "ptmw analyse exposure-robustness",
+    "tables/pre_trend_macros": "ptmw analyse pass-through",
 }
 
 _INPUT = re.compile(r"\\input\{(tables/[a-z_]+)\}")

@@ -23,8 +23,10 @@ import numpy.typing as npt
 import pandas as pd
 
 from pt_mw_inflation.analysis.inference import (
+    JointTest,
     clustered_t_statistic,
     holm_adjusted,
+    joint_wald_test,
     wild_cluster_bootstrap,
 )
 
@@ -280,3 +282,84 @@ def estimate_event_study(
         }
     )
     return pd.DataFrame(rows).sort_values("event_time").reset_index(drop=True)
+
+
+def assess_pre_trends(
+    frame: pd.DataFrame,
+    *,
+    outcome: str,
+    shock: str,
+    leads: int = 6,
+    lags: int = 12,
+    entity: str = "region_category",
+    time: str = "month",
+    cluster: str = "region",
+    reference_lead: int = 1,
+    draws: int = 999,
+) -> JointTest:
+    """Test whether the leads of the shock are jointly zero.
+
+    The falsification battery this project set itself requires that leads of the
+    statutory change do not predict pre-treatment inflation. Reading each lead
+    off an event-study plot answers that badly: it multiplies the chance one lead
+    looks significant, and it misses a trend spread thinly across several leads
+    without any one standing out. This restricts them together.
+
+    Args:
+        frame: Panel with one row per entity and period.
+        outcome: Log price level; the response is its first difference.
+        shock: Exposure or statutory shock.
+        leads: Pre-periods to include.
+        lags: Post-periods to include, which stay unrestricted.
+        entity: Region-category identifier.
+        time: Calendar period identifier.
+        cluster: Clustering level.
+        reference_lead: Lead normalised to zero and omitted from the design.
+        draws: Bootstrap draws when the sign space is too large to enumerate.
+
+    Returns:
+        The joint test over the lead coefficients.
+
+    Raises:
+        ValueError: If required columns are missing, or no lead survives the
+            sample, which would silently make this a test of nothing.
+    """
+    required = {outcome, shock, entity, time, cluster}
+    missing = required.difference(frame.columns)
+    if missing:
+        raise ValueError(f"Missing columns: {sorted(missing)}")
+
+    ordered = frame.sort_values([entity, time]).copy()
+    grouped = ordered.groupby(entity, observed=True)[outcome]
+    ordered["__growth"] = grouped.diff()
+
+    event_times = [offset for offset in range(-leads, lags + 1) if offset != -reference_lead]
+    shock_columns: list[str] = []
+    for offset in event_times:
+        column = f"__event_{offset}"
+        ordered[column] = ordered.groupby(entity, observed=True)[shock].shift(-offset)
+        shock_columns.append(column)
+
+    sample = ordered.dropna(subset=["__growth", *shock_columns])
+    if sample.empty:
+        raise ValueError("no observations survive the event window")
+
+    design, _ = build_two_way_design(
+        sample,
+        shock=shock_columns[0],
+        entity=entity,
+        time=time,
+        controls=shock_columns[1:],
+    )
+    outcome_values = sample["__growth"].to_numpy(dtype=np.float64)
+    cluster_labels = pd.factorize(sample[cluster])[0]
+
+    # Only the leads are restricted. The lags carry whatever effect exists and
+    # must stay free, or the test would reject whenever the policy did anything.
+    lead_positions = [index for index, offset in enumerate(event_times) if offset < 0]
+    if not lead_positions:
+        raise ValueError("no lead terms in the event window; nothing to falsify")
+
+    return joint_wald_test(
+        design, outcome_values, cluster_labels, targets=lead_positions, draws=draws
+    )
