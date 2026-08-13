@@ -41,29 +41,54 @@ policy_residual_t = g_minimum_wage_t - g_benchmark_t
 
 This residual is descriptive rather than automatically causal. The causal analysis uses predetermined exposure measures and panel variation.
 
-## Planned identification strategy
+## Identification strategy, and what it delivered
 
-The preferred price-pass-through design is based on an exposure shock of the form
+Two designs were pursued and both are reported as negative results. The README
+describes what the repository does, not what was hoped for; the reasoning behind
+each step is in `docs/research_design.md`.
 
-```text
-shock[r, c, t] = regional_minimum_wage_change[r, t]
-                 * predetermined_minimum_wage_bite[r, s]
-                 * labour_cost_share[s]
-                 * production_to_consumption_weight[c, s]
-```
-
-where `r` is region, `s` is production industry, and `c` is a CPI/HICP consumption category.
-
-Dynamic responses are estimated with panel local projections:
+**Regional policy variation.** Madeira legislates its own statutory wage, so its
+change can differ from the mainland's. Dynamic responses are estimated with panel
+local projections:
 
 ```text
 Delta_h log(P[r,c,t+h]) = alpha[r,c] + lambda[t]
-                          + beta_h * shock[r,c,t]
-                          + Gamma X[r,c,t]
+                          + beta_h * shock[r,t]
                           + error[r,c,t+h]
 ```
 
-The design is accompanied by pre-trend diagnostics, alternative exposure definitions, wild-cluster or randomization-based inference for the small number of regions, and robustness to energy, VAT, tourism, imported inflation, and pandemic shocks.
+Ten region-months diverge over the window. Conventional clustered inference calls
+five horizons significant; the wild cluster bootstrap leaves one, and Holm's
+correction across the horizon family leaves none.
+
+**Shift-share exposure.** Regional industry composition from Eurostat's regional
+accounts is combined with the national minimum-wage bite by activity:
+
+```text
+exposure[r] = sum_s employment_share[r, s] * minimum_wage_bite[s]
+```
+
+and interacted with the *national* statutory change. Exposure is predetermined:
+the October 2015 survey round precedes every shock in the window. The measure
+spans about two percentage points across nine regions, and not one horizon is
+significant even by conventional clustered inference.
+
+**Not built.** A fuller structural exposure would add a labour-cost share by
+industry and a production-to-consumption bridge:
+
+```text
+shock[r, c, t] = exposure[r, c] * national_minimum_wage_change[t]
+```
+
+Neither the labour-cost shares nor the bridge exists in this repository. Both
+new terms would be national, so they would vary the shock across consumption
+categories without widening the regional variation that both designs identify as
+the binding constraint.
+
+Diagnostics that are implemented: a joint pre-trend test over the leads,
+wild-cluster and randomization inference for the small number of regions, Holm
+correction across horizons, sixteen alternative constructions of the exposure
+measure, minimum detectable effects, and a seasonal-confound diagnostic.
 
 ## Public data sources
 
@@ -135,24 +160,39 @@ The same three gates run in CI on every push and pull request, against Python
 ## Main commands
 
 ```bash
-# Download configured raw public sources
+# Download every configured raw public source
 poetry run ptmw data download-sources
 
-# Download detailed Portuguese HICP data from Eurostat
-poetry run ptmw data eurostat-hicp --geo PT
+# Regional consumer price panel from Statistics Portugal
+poetry run ptmw data ine-cpi
 
-# Build the long-run annual macro dataset
+# Regional and national employment by industry from Eurostat
+poetry run ptmw data regional-employment
+
+# Statutory minimum-wage panel, national and regional
+poetry run ptmw build minimum-wage
+
+# Long-run annual macro dataset
 poetry run ptmw build macro
 
-# Construct the minimum-wage policy residual
-poetry run ptmw build policy-residual
+# Shift-share exposure, predetermined for shocks from 2016
+poetry run ptmw build regional-exposure --bite-period 2015-10 --first-shock-year 2016
 
-# Run baseline descriptive analysis
+# Long-run figures, tables and headline macros
 poetry run ptmw analyse macro
 
-# Run the panel/local-projection analysis after exposure data are available
+# Regional policy design, pre-trend test and seasonal diagnostic
 poetry run ptmw analyse pass-through
+
+# Shift-share exposure design
+poetry run ptmw analyse exposure-design
+
+# The exposure design under sixteen alternative constructions
+poetry run ptmw analyse exposure-robustness
 ```
+
+Everything above, plus the LaTeX build, runs as `make paper`. That target is
+verified to work from an empty tree.
 
 ## Reproducibility rules
 
@@ -166,7 +206,12 @@ poetry run ptmw analyse pass-through
 
 ## Publication strategy
 
-The macro history is the context and validation layer. The publication claim should rest on the exposure-based price analysis, not on a raw national time-series correlation. See `docs/research_design.md` and `docs/literature_map.md`.
+The claim rests on the long-run statutory and accounting layer, and on a
+documented negative identification result. It does not rest on the exposure
+analysis, which is reported precisely because it fails: the paper shows what the
+available variation can and cannot support rather than presenting a weakly
+identified estimate. See `docs/research_design.md`, `docs/decision_log.md` and
+`docs/literature_map.md`.
 
 ## Contributing
 
