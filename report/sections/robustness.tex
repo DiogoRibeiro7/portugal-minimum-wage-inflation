@@ -108,6 +108,30 @@ is identified by \IdentifyingEvents{} events in a single small, remote,
 tourism-intensive region, so anything else moving Madeiran prices on those dates
 enters the coefficient with nothing to separate it out.
 
+\subsection{Do the leads predict prices before the policy moves?}
+
+The falsification battery this project set itself requires that leads of the
+statutory change carry no information about pre-treatment inflation. We test the
+\PreTrendLeads{} leads jointly rather than reading them off a plot, because
+inspecting them one at a time both multiplies the chance that one looks
+significant and misses a trend spread thinly across several without any single
+one standing out.
+
+The joint restriction \PreTrendRejects{} the null at five per cent, with a
+bootstrap $p$-value of \PreTrendP{}. The gap between references is the more
+instructive number. The Wald statistic is \PreTrendWald{}, which against the
+asymptotic $\chi^2$ reference would be overwhelming evidence of a pre-trend;
+referred instead to its own wild cluster bootstrap distribution, it sits at a
+tenth. With nine clusters the asymptotic reference is not usable, and this is
+the clearest illustration of that fact anywhere in the paper.
+
+Two cautions attach to reading this as a pass. A design that struggles to detect
+a treatment effect will also struggle to detect a pre-trend, so failing to
+reject is weak evidence of the absence of one. And $p=\PreTrendP{}$ is not
+comfortable: it is the kind of value that would become a rejection under a
+modestly different window or lead count. We report it as a diagnostic that does
+not disqualify the design, not as a clean bill of health.
+
 \subsection{The exposure design, built, and why it is too flat}
 
 The standard substitute for regional policy variation is regional exposure to a
