@@ -42,6 +42,32 @@ FloatArray = npt.NDArray[np.float64]
 #: would use, and enumeration removes simulation error entirely.
 MAX_CLUSTERS_FOR_ENUMERATION = 20
 
+#: Relative slack when comparing a bootstrap statistic to the observed one.
+#:
+#: When the sign space is enumerated it contains the all-positive vector, which
+#: rebuilds the original sample: its statistic *is* the observed statistic and
+#: has to be counted, which is why the enumerated branch adds no further draw.
+#: The two are computed by different routes, so they agree to rounding rather
+#: than to the bit, and a bare ``>=`` then settled that draw by which way the
+#: last bits fell. Because the draws come in plus/minus pairs, that was worth
+#: two draws of the p-value, and on a design where whole clusters contribute no
+#: variation each distinct statistic repeats and it was worth more still: eight
+#: of 512 at one horizon of the regional design.
+#:
+#: The value is measured rather than guessed, because the two quantities it has
+#: to separate are both observable. Across the fourteen horizons of the two
+#: reported designs, the draw that reproduces the observed statistic sits
+#: between 7e-12 and 5e-8 of it in relative terms --- the loosest cases being
+#: the horizons whose statistic is nearest zero, where the cancellation is
+#: worst --- while the closest genuinely distinct draw never comes nearer than
+#: 2e-4. Anything inside that band settles the tie by arithmetic rather than by
+#: luck, and this sits near the middle of it on a log scale.
+#:
+#: The band is worth checking again if the designs change: a tolerance below it
+#: misses the tie it exists for, which is what a tighter 1e-9 did at the
+#: twenty-four-month horizon of the exposure design.
+_TIE_TOLERANCE = 1e-6
+
 
 @dataclass(frozen=True)
 class ClusterInference:
@@ -119,6 +145,96 @@ class _ClusterProjector:
         standard_error = float(np.sqrt(variance))
         return coefficient, standard_error, coefficient / standard_error
 
+    def restricted_fit(self, outcome: FloatArray) -> FloatArray:
+        """Fit the design without the target column, reusing the full projection.
+
+        Imposing the null means fitting the reduced design, and that fit is
+        needed afresh for every bootstrap and, when the test is inverted, for
+        every candidate value. Decomposing the reduced matrix each time was the
+        most expensive thing in this module by a wide margin: on the regional
+        design a least-squares solve of it costs twelve seconds, against two
+        milliseconds here.
+
+        Frisch-Waugh removes the need for a second decomposition altogether.
+        With ``b`` the full coefficient vector and ``x_perp`` the target
+        regressor after the other columns are projected out, the fit on the
+        reduced design differs from the full fit by exactly the part of the
+        target regressor the other columns cannot explain::
+
+            restricted_fit = X @ b - b[target] * x_perp
+
+        and the projector already holds ``x_perp``: the target row of
+        ``(X'X)^-1 X'`` is ``x_perp / (x_perp' x_perp)``, which is
+        ``self.leverage``. Where the other columns explain the target regressor
+        exactly there is nothing to remove and the two fits coincide, which is
+        the degenerate case the guard below returns.
+        """
+        beta = self.projector @ outcome
+        fitted = self.design @ beta
+        scale = float(self.leverage @ self.leverage)
+        if not np.isfinite(scale) or scale <= 0.0:
+            return np.asarray(fitted, dtype=np.float64)
+        residualised = self.leverage / scale
+        return np.asarray(fitted - beta[self.target] * residualised, dtype=np.float64)
+
+    def bootstrap_t_statistics(self, outcome: FloatArray, signs: FloatArray) -> FloatArray:
+        """Statistics for every sign vector at once, without a loop over draws.
+
+        The wild *cluster* bootstrap gives each cluster's whole residual block a
+        single sign, so however many draws are taken, every resampled outcome is
+        a combination of the same ``clusters + 1`` vectors: the restricted fit,
+        and the residuals masked to one cluster at a time. Projecting those once
+        and recombining is not an approximation to the per-draw loop; it is the
+        same arithmetic with the shared work done once.
+
+        That is what makes inverting the test affordable. On the regional design
+        the loop projected a matrix of 309 columns once per draw, 512 times for
+        every candidate value; this projects it ten times, whatever the number
+        of draws.
+
+        Args:
+            outcome: Dependent variable the null is imposed on.
+            signs: Cluster sign vectors, one row per draw.
+
+        Returns:
+            One t statistic per draw, ``nan`` where the variance is unusable.
+        """
+        fitted = self.restricted_fit(outcome)
+        residuals = outcome - fitted
+
+        # The sign space in the coordinates it actually occupies: column g
+        # carries cluster g's residuals and zero elsewhere, so the resampled
+        # outcome for sign vector s is `fitted + basis @ s`.
+        basis = np.zeros((outcome.shape[0], self.n_clusters), dtype=np.float64)
+        for column, group in enumerate(self.group_slices):
+            basis[group, column] = residuals[group]
+
+        basis_beta = self.projector @ basis
+        basis_residual = basis - self.design @ basis_beta
+
+        weighted_basis = self.leverage[:, None] * basis_residual
+        loading = np.array(
+            [weighted_basis[group].sum(axis=0) for group in self.group_slices], dtype=np.float64
+        )
+
+        # The restricted fit contributes nothing to either quantity, and that is
+        # definitional rather than approximate: it is the part of the outcome
+        # the *other* columns explain, so its coefficient on the target is zero
+        # and it leaves no residual against the full design. Recomputing the two
+        # numerically and carrying the result is not harmless. The rounding
+        # residue breaks the sign symmetry the procedure has, and the draws come
+        # in plus/minus pairs whose statistics differ only in sign, so a tie that
+        # ought to be exact became a coin flip worth a whole draw of the p-value.
+        sign_matrix = np.asarray(signs, dtype=np.float64).T
+        scores = loading @ sign_matrix
+        variance = self.correction * np.einsum("gd,gd->d", scores, scores)
+        coefficients = basis_beta[self.target] @ sign_matrix
+
+        statistics = np.full(coefficients.shape, np.nan, dtype=np.float64)
+        usable = np.isfinite(variance) & (variance > 0.0)
+        statistics[usable] = coefficients[usable] / np.sqrt(variance[usable])
+        return statistics
+
 
 def cluster_robust_covariance(
     design: FloatArray,
@@ -187,6 +303,96 @@ def _sign_vectors(n_clusters: int, draws: int, rng: np.random.Generator) -> tupl
     return np.asarray(signs, dtype=np.float64), False
 
 
+def _prepare(
+    design: FloatArray,
+    outcome: FloatArray,
+    clusters: npt.NDArray[np.int_],
+    *,
+    target: int,
+    draws: int,
+    seed: int,
+) -> tuple[_ClusterProjector, FloatArray, bool, int]:
+    """Validate the inputs and build everything that depends on the design alone.
+
+    Every procedure here needs the same three things and they cost the same to
+    build regardless of which one asks: the projection, the cluster partition
+    and the sign vectors. On the region-by-category design the projection is a
+    pseudo-inverse of a matrix with 2,695 columns and takes about a minute, so
+    building it once per horizon rather than once per procedure is the
+    difference between a design that can be estimated and one that cannot.
+
+    Args:
+        design: Regressor matrix including fixed-effect dummies.
+        outcome: Dependent variable, used only to check the shapes agree.
+        clusters: Integer cluster label per observation.
+        target: Column index of the coefficient of interest.
+        draws: Bootstrap draws when the sign space is too large to enumerate.
+        seed: Seed for reproducibility.
+
+    Returns:
+        The projector, the sign vectors, whether they enumerate the space, and
+        the number of clusters.
+
+    Raises:
+        ValueError: If shapes disagree or fewer than two clusters are present.
+    """
+    design = np.asarray(design, dtype=np.float64)
+    outcome = np.asarray(outcome, dtype=np.float64)
+    clusters = np.asarray(clusters)
+
+    if design.shape[0] != outcome.shape[0] or clusters.shape[0] != outcome.shape[0]:
+        raise ValueError("design, outcome and clusters must have the same number of rows")
+
+    unique, cluster_index = np.unique(clusters, return_inverse=True)
+    n_clusters = unique.size
+    if n_clusters < 2:
+        raise ValueError("at least two clusters are required")
+
+    projector = _ClusterProjector(design, cluster_index, target)
+    signs, exhaustive = _sign_vectors(n_clusters, draws, np.random.default_rng(seed))
+    return projector, signs, exhaustive, n_clusters
+
+
+def _restricted_bootstrap(
+    projector: _ClusterProjector,
+    outcome: FloatArray,
+    signs: FloatArray,
+    *,
+    exhaustive: bool,
+) -> tuple[float, float, float, float]:
+    """Run the restricted bootstrap for one outcome against precomputed signs.
+
+    Both the reported test and the interval that inverts it come through here.
+    Sharing the implementation rather than the definition is what makes the two
+    agree at a candidate of zero: it is not that they compute the same thing, it
+    is that they are the same call.
+
+    Args:
+        projector: Precomputed machinery for the design being tested.
+        outcome: Dependent variable.
+        signs: Cluster sign vectors, one row per draw.
+        exhaustive: Whether ``signs`` enumerates the space rather than sampling.
+
+    Returns:
+        Coefficient, cluster-robust standard error, t statistic and p-value.
+    """
+    coefficient, standard_error, observed = projector.fit(outcome)
+    statistics = projector.bootstrap_t_statistics(outcome, signs)
+
+    finite = statistics[np.isfinite(statistics)]
+    if finite.size == 0 or not np.isfinite(observed):
+        return coefficient, standard_error, observed, float("nan")
+
+    threshold = abs(observed) * (1.0 - _TIE_TOLERANCE)
+    extreme = int(np.sum(np.abs(finite) >= threshold))
+    # When the whole sign space is enumerated the observed sample is the
+    # all-positive draw already inside it, so adding a further draw would
+    # correct for simulation noise that is not present. When draws are
+    # sampled, counting the observed sample is what keeps the p-value valid.
+    p_value = extreme / finite.size if exhaustive else (extreme + 1) / (finite.size + 1)
+    return coefficient, standard_error, observed, min(p_value, 1.0)
+
+
 def wild_cluster_bootstrap(
     design: FloatArray,
     outcome: FloatArray,
@@ -219,51 +425,21 @@ def wild_cluster_bootstrap(
     Raises:
         ValueError: If fewer than two clusters are present, or shapes disagree.
     """
-    design = np.asarray(design, dtype=np.float64)
-    outcome = np.asarray(outcome, dtype=np.float64)
-    clusters = np.asarray(clusters)
+    projector, signs, exhaustive, n_clusters = _prepare(
+        design, outcome, clusters, target=target, draws=draws, seed=seed
+    )
 
-    if design.shape[0] != outcome.shape[0] or clusters.shape[0] != outcome.shape[0]:
-        raise ValueError("design, outcome and clusters must have the same number of rows")
-
-    unique, cluster_index = np.unique(clusters, return_inverse=True)
-    n_clusters = unique.size
-    if n_clusters < 2:
-        raise ValueError("at least two clusters are required")
-
-    projector = _ClusterProjector(design, cluster_index, target)
-    coefficient, standard_error, observed_t = projector.fit(outcome)
-
-    # Restricted fit: the null of no effect imposed by dropping the regressor.
-    restricted_design = np.delete(design, target, axis=1)
-    restricted_beta = _ols(restricted_design, outcome)
-    restricted_fit = restricted_design @ restricted_beta
-    restricted_residuals = outcome - restricted_fit
-
-    rng = np.random.default_rng(seed)
-    signs, exhaustive = _sign_vectors(n_clusters, draws, rng)
-
-    bootstrap_t = np.empty(signs.shape[0], dtype=np.float64)
-    for draw, sign_vector in enumerate(signs):
-        resampled = restricted_fit + restricted_residuals * sign_vector[cluster_index]
-        _, _, bootstrap_t[draw] = projector.fit(resampled)
-
-    finite = bootstrap_t[np.isfinite(bootstrap_t)]
-    if finite.size == 0 or not np.isfinite(observed_t):
-        p_value = float("nan")
-    else:
-        extreme = int(np.sum(np.abs(finite) >= abs(observed_t)))
-        # When the whole sign space is enumerated the observed sample is the
-        # all-positive draw already inside it, so adding a further draw would
-        # correct for simulation noise that is not present. When draws are
-        # sampled, counting the observed sample is what keeps the p-value valid.
-        p_value = extreme / finite.size if exhaustive else (extreme + 1) / (finite.size + 1)
+    # The null of no effect is imposed inside the projector, by fitting the
+    # design without the regressor of interest and resampling around that fit.
+    coefficient, standard_error, observed_t, p_value = _restricted_bootstrap(
+        projector, np.asarray(outcome, dtype=np.float64), signs, exhaustive=exhaustive
+    )
 
     return ClusterInference(
         coefficient=coefficient,
         standard_error=standard_error,
         t_statistic=observed_t,
-        p_value=min(p_value, 1.0),
+        p_value=p_value,
         method="wild_cluster_bootstrap",
         clusters=n_clusters,
         draws=int(signs.shape[0]),
@@ -619,8 +795,14 @@ def joint_wald_test(
     gram = design.T @ design
     try:
         projector = np.linalg.solve(gram, design.T)
-    except np.linalg.LinAlgError as error:
-        raise ValueError("design is rank deficient; cannot form the projection") from error
+    except np.linalg.LinAlgError:
+        # A design absorbing three factors is rank deficient by construction:
+        # region-time and category-time dummies both span the calendar-month
+        # main effects. The pseudo-inverse resolves the redundancy without
+        # touching any identified coefficient, so the restricted block and its
+        # Wald statistic are unchanged. Reached only on the singular case, so
+        # the two-factor designs keep the solve they were computed with.
+        projector = np.linalg.pinv(gram) @ design.T
 
     projector_selected = projector[selected]
     cluster_masks = [cluster_index == label for label in range(n_clusters)]
@@ -709,10 +891,11 @@ def invert_bootstrap_interval(
     level: float = 0.95,
     grid_points: int = 41,
     span: float = 6.0,
+    expansions: int = 6,
     draws: int = 999,
     seed: int = 20260814,
 ) -> InvertedInterval:
-    """Invert the restricted bootstrap test to obtain an interval.
+    r"""Invert the restricted bootstrap test to obtain an interval.
 
     The natural way to attach an interval to a bootstrap p-value is to resample
     around the estimate and take quantiles. With this few clusters that performs
@@ -725,7 +908,15 @@ def invert_bootstrap_interval(
     subtracted from the outcome and the resulting coefficient is tested against
     zero by the same restricted bootstrap the paper reports. The interval is the
     set of candidates not rejected. At :math:`\beta_0 = 0` this reproduces the
-    reported p-value exactly, so the interval and the test cannot disagree.
+    reported p-value exactly, because it is not merely the same procedure but
+    the same call: both go through :func:`_restricted_bootstrap`. The interval
+    and the test therefore cannot disagree.
+
+    Every quantity that depends on the design alone --- its projection, the
+    cluster partition, and the sign vectors --- is built once and reused across
+    candidates, since only the outcome changes from one to the next. Rebuilding
+    them per candidate is what previously made this too slow to run in the
+    pipeline, at some hundreds of decompositions for a seven-horizon path.
 
     Args:
         design: Regressor matrix including fixed-effect dummies.
@@ -734,57 +925,108 @@ def invert_bootstrap_interval(
         target: Column index of the coefficient of interest.
         level: Coverage level.
         grid_points: Candidates tested across the search range.
-        span: Half-width of the search range, in cluster-robust standard errors.
+        span: Half-width of the first search range, in cluster-robust standard
+            errors.
+        expansions: How many times the range may double when the interval runs
+            past it. Zero searches ``span`` alone and reports what it finds.
         draws: Bootstrap draws when the sign space is too large to enumerate.
         seed: Seed for reproducibility.
 
-    This is correct and, on a design carrying one dummy per region-category and
-    per month, too slow to run in the pipeline as written. Each candidate calls
-    the bootstrap afresh, and each call rebuilds the projection of a design with
-    thousands of columns, so a seven-horizon path costs some hundreds of
-    pseudo-inverses. The fix is the one already applied to
-    :func:`joint_wald_test`: build the projection once and reuse it across
-    candidates, since only the outcome changes. Until that is done this is used
-    on small designs and in tests, and is deliberately not wired into
-    ``make paper``.
-
     Returns:
-        The interval, with a flag for whether it is bounded by the grid.
+        The interval, with a flag for whether it is bounded by the grid. An
+        unbounded interval means the search was exhausted before the interval
+        closed, so the endpoints are the search limits and understate it.
 
     Raises:
-        ValueError: If the level is not a probability, or the grid is too small
-            to describe an interval.
+        ValueError: If the level is not a probability, the grid is too small to
+            describe an interval, shapes disagree, or fewer than two clusters
+            are present.
     """
     if not 0.0 < level < 1.0:
         raise ValueError(f"level must lie in (0, 1), got {level}")
     if grid_points < 3:
         raise ValueError(f"at least three grid points are required, got {grid_points}")
 
-    design = np.asarray(design, dtype=np.float64)
-    outcome = np.asarray(outcome, dtype=np.float64)
+    projector, signs, exhaustive, _ = _prepare(
+        design, outcome, clusters, target=target, draws=draws, seed=seed
+    )
+    return _invert(
+        projector,
+        np.asarray(design, dtype=np.float64),
+        np.asarray(outcome, dtype=np.float64),
+        signs,
+        exhaustive=exhaustive,
+        target=target,
+        level=level,
+        grid_points=grid_points,
+        span=span,
+        expansions=expansions,
+    )
 
-    coefficient, standard_error, _ = clustered_t_statistic(design, outcome, clusters, target)
+
+def _invert(
+    projector: _ClusterProjector,
+    design: FloatArray,
+    outcome: FloatArray,
+    signs: FloatArray,
+    *,
+    exhaustive: bool,
+    target: int,
+    level: float,
+    grid_points: int,
+    span: float,
+    expansions: int,
+) -> InvertedInterval:
+    """Search for the candidates the restricted bootstrap does not reject.
+
+    Split out so the interval can be built from a projector that has already
+    been paid for, which is what
+    :func:`bootstrap_with_interval` does.
+
+    Raises:
+        ValueError: If the coefficient has no usable standard error to search
+            around, which leaves no scale to build a search range from.
+    """
+    coefficient, standard_error, _ = projector.fit(outcome)
     if not np.isfinite(standard_error) or standard_error <= 0:
         raise ValueError("the coefficient has no usable standard error to search around")
 
     alpha = 1.0 - level
-    candidates = np.linspace(
-        coefficient - span * standard_error,
-        coefficient + span * standard_error,
-        grid_points,
-    )
     regressor = design[:, target]
 
-    accepted: list[float] = []
-    for candidate in candidates:
-        # Testing beta = candidate is testing zero once the candidate effect is
-        # removed, which is what lets the reported procedure be reused unchanged.
-        adjusted = outcome - candidate * regressor
-        result = wild_cluster_bootstrap(
-            design, adjusted, clusters, target=target, draws=draws, seed=seed
-        )
-        if np.isfinite(result.p_value) and result.p_value > alpha:
-            accepted.append(float(candidate))
+    def scan(half_width: float) -> tuple[list[float], FloatArray]:
+        """Test every candidate across one search range."""
+        grid = np.linspace(coefficient - half_width, coefficient + half_width, grid_points)
+        kept = []
+        for candidate in grid:
+            # Testing beta = candidate is testing zero once the candidate effect
+            # is removed, which is what lets the reported procedure be reused
+            # unchanged.
+            adjusted = outcome - candidate * regressor
+            *_, p_value = _restricted_bootstrap(projector, adjusted, signs, exhaustive=exhaustive)
+            if np.isfinite(p_value) and p_value > alpha:
+                kept.append(float(candidate))
+        return kept, grid
+
+    # The search range is quoted in cluster-robust standard errors because they
+    # are the only scale available in advance, but this module exists because
+    # that scale cannot be trusted with few clusters, and it fails here in the
+    # direction that matters. Where the clustered error most understates the
+    # uncertainty, the bootstrap interval is widest and the range built from it
+    # is narrowest: on the regional design at impact a t statistic of 8.2 comes
+    # with a bootstrap p-value of 0.23, and every candidate within six standard
+    # errors survives, so the endpoints returned would have been the edges of
+    # the search rather than of the interval.
+    #
+    # Widening until the interval closes costs one scan each time and settles
+    # the scale from the test itself instead of from a statistic it distrusts.
+    half_width = span * standard_error
+    accepted, candidates = scan(half_width)
+    for _ in range(expansions):
+        if accepted and min(accepted) > candidates[0] and max(accepted) < candidates[-1]:
+            break
+        half_width *= 2.0
+        accepted, candidates = scan(half_width)
 
     if not accepted:
         # Every candidate rejected. Reporting a degenerate interval would read as
@@ -808,3 +1050,98 @@ def invert_bootstrap_interval(
         bounded=bounded,
         grid_points=grid_points,
     )
+
+
+def bootstrap_with_interval(
+    design: FloatArray,
+    outcome: FloatArray,
+    clusters: npt.NDArray[np.int_],
+    *,
+    target: int,
+    interval: bool = True,
+    level: float = 0.95,
+    grid_points: int = 41,
+    span: float = 6.0,
+    expansions: int = 6,
+    draws: int = 999,
+    seed: int = 20260809,
+) -> tuple[ClusterInference, InvertedInterval | None]:
+    """Test one coefficient and bound it, paying for the projection once.
+
+    The point estimate, its cluster-robust standard error, the bootstrap
+    p-value and the inverted interval are four answers from one decomposition,
+    and computing them separately pays for that decomposition four times. On the
+    two-factor designs that was merely wasteful. On the region-by-category
+    design, whose matrix carries one dummy per region-month and per
+    category-month, it was prohibitive: the pseudo-inverse alone takes about a
+    minute, and the least-squares solve the standard error used to come from
+    took nearer ten.
+
+    Sharing the projection also removes a subtler problem. The estimate reported
+    beside a bootstrap p-value ought to be the estimate that p-value was
+    computed from, and running two procedures over the same design left that as
+    a coincidence rather than a guarantee.
+
+    Args:
+        design: Regressor matrix including fixed-effect dummies.
+        outcome: Dependent variable.
+        clusters: Integer cluster label per observation.
+        target: Column index of the coefficient of interest.
+        interval: Whether to invert the test as well as run it.
+        level: Coverage level for the interval.
+        grid_points: Candidates tested across each search range.
+        span: Half-width of the first search range, in standard errors.
+        expansions: How many times the range may double.
+        draws: Bootstrap draws when the sign space is too large to enumerate.
+        seed: Seed shared by the test and the interval, so the two draw the same
+            sign vectors and cannot disagree.
+
+    Returns:
+        The test, and the interval when it was asked for.
+
+    Raises:
+        ValueError: If shapes disagree, fewer than two clusters are present, or
+            the interval was asked for on a coefficient with no usable standard
+            error to search around.
+    """
+    if interval:
+        if not 0.0 < level < 1.0:
+            raise ValueError(f"level must lie in (0, 1), got {level}")
+        if grid_points < 3:
+            raise ValueError(f"at least three grid points are required, got {grid_points}")
+
+    projector, signs, exhaustive, n_clusters = _prepare(
+        design, outcome, clusters, target=target, draws=draws, seed=seed
+    )
+    design = np.asarray(design, dtype=np.float64)
+    outcome = np.asarray(outcome, dtype=np.float64)
+
+    coefficient, standard_error, observed_t, p_value = _restricted_bootstrap(
+        projector, outcome, signs, exhaustive=exhaustive
+    )
+    test = ClusterInference(
+        coefficient=coefficient,
+        standard_error=standard_error,
+        t_statistic=observed_t,
+        p_value=p_value,
+        method="wild_cluster_bootstrap",
+        clusters=n_clusters,
+        draws=int(signs.shape[0]),
+        exhaustive=exhaustive,
+    )
+    if not interval:
+        return test, None
+
+    bounds = _invert(
+        projector,
+        design,
+        outcome,
+        signs,
+        exhaustive=exhaustive,
+        target=target,
+        level=level,
+        grid_points=grid_points,
+        span=span,
+        expansions=expansions,
+    )
+    return test, bounds

@@ -78,7 +78,26 @@ minimum-wage bite by activity. The resulting shift-share measure takes
 regions and spans
 \ExposureSpreadPP{}~percentage points, which is too narrow a range to identify
 a price response. That is a fact about how little the bite varies across
-industries in Portugal, not a missing dataset, and it is reported as such.
+industries in Portugal, not a missing dataset, and it is reported as such. We
+estimate the design anyway and report confidence intervals obtained by
+inverting the bootstrap test rather than the $p$-values alone, because the two
+answer different questions: at the horizon where it is widest the interval runs
+from \ExposureWidestIntervalLower{} to \ExposureWidestIntervalUpper{}. A design
+whose interval admits full pass-through, sixty times full pass-through, and the
+same magnitudes negative, has not found an absence of pass-through. It has
+failed to find anything, and saying so requires the interval.
+
+We then build the fuller design that a structural exposure allows, interacting
+the statutory change with a region-by-consumption-category cost share so that
+region-time and category-time effects can be absorbed together. It is the only
+specification in the paper that rejects anything, and it is also the one whose
+magnitudes rule it out: its estimates imply differential price responses of up
+to \StructuralPeakResponsePP{}~percentage points, where complete pass-through of
+the entire minimum-wage cost bill could produce at most
+\StructuralPassThroughCeilingPP{}. We report it because it settles what the
+binding constraint is. Absorbing the confounds the simpler designs are exposed
+to did not make the effect identifiable, because policy is assigned to nine
+regions and no amount of consumption detail adds a tenth.
 
 We therefore make no causal claim about pass-through, and explain in
 Section~\ref{sec:robustness} what would be required to support one. What the

@@ -73,7 +73,11 @@ and Table~\ref{tab:regional-design} shows it on the actual data.
   \centering
   \caption{Cumulative price response to the statutory change, regional design.
   Estimated over the window in which Madeira's register is contiguous, with
-  region-category and calendar-time fixed effects, clustered on region.}
+  region-category and calendar-time fixed effects, clustered on region. The
+  interval is obtained by inverting the bootstrap test rather than from the
+  standard error, so it and the $p$-value beside it are the same procedure read
+  two ways; an asterisk would mark an interval whose search did not close, and
+  \IntervalsBounded{} of these closed.}
   \label{tab:regional-design}
   \input{tables/regional_design}
 \end{table}
@@ -84,6 +88,20 @@ level. The bootstrap leaves \BootstrapSurvivors{} of them standing, at
 $p =\ $\MinBootstrapP{}. Had we reported only the third column, the paper would
 have claimed substantial pass-through of minimum-wage costs into consumer prices
 at nearly every horizon.
+
+The last column is the one to read, and it is the column a $p$-value cannot
+supply. At \PeakHorizon{}~month the interval runs from \PeakIntervalLower{} to
+\PeakIntervalUpper{}, so what the data exclude is a response above
+\PeakIntervalUpper{} and below \PeakIntervalLower{}, which leaves everything
+from a negligible pass-through to one several times the point estimate. At
+\WidestIntervalHorizon{}~months it runs from \WidestIntervalLower{} to
+\WidestIntervalUpper{} and excludes almost nothing of interest. These are not
+standard-error bands: each is the set of values the reported bootstrap test does
+not reject, obtained by inverting it, so an interval excluding zero and a
+$p$-value below five per cent are guaranteed to agree. A band built the
+conventional way, by resampling around the estimate, did not agree --- it
+declared horizons significant that the null-imposed test does not reject --- and
+that disagreement is why it was discarded.
 
 That surviving horizon is not a result, and the reason is the same one that
 motivated the bootstrap. \HorizonsEstimated{} horizons of one series are a
@@ -175,7 +193,9 @@ it.
   predetermined regional exposure. Exposure is frozen on 2015 composition and
   the October~2015 survey round; the window begins in 2016, so exposure precedes
   every shock. Region-category and calendar-time fixed effects, clustered on
-  region.}
+  region. The interval inverts the bootstrap test, as in
+  Table~\ref{tab:regional-design}; \ExposureIntervalsBounded{} of these closed
+  inside the search.}
   \label{tab:exposure-design}
   \input{tables/exposure_design}
 \end{table}
@@ -193,6 +213,17 @@ have nothing left to reject. Inference known to over-reject cannot manufacture a
 single false positive here, and the coefficients wander as far as
 \ExposureWidestCoefficient{} at \ExposureWidestHorizon{}~months without
 approaching significance.
+
+That is the weakest possible way to put it, and the intervals say why. At
+\ExposureWidestIntervalHorizon{}~months the inverted interval runs from
+\ExposureWidestIntervalLower{} to \ExposureWidestIntervalUpper{}. A coefficient
+of one would mean the wage rise passed into prices one for one in the most
+exposed region relative to the least; this interval admits that, admits sixty
+times that, and admits the same magnitudes with the sign reversed. Reporting
+only that the design fails to reject would invite the reading that it found no
+pass-through. It did not find no pass-through. It failed to locate the
+coefficient anywhere within two orders of magnitude, and no null result stated
+as a $p$-value can convey that.
 
 The same falsification test applies here, and this design passes it more
 comfortably than the policy design does. The \ExposurePreTrendLeads{} leads
@@ -249,7 +280,10 @@ horizons where the estimate is tightest, which would be informative; but at six
 and eighteen months the interval spans more than three percentage points, which
 is wider than any pass-through estimate in this literature. At those horizons
 the finding is not that there is no response. It is that this design cannot see
-one.
+one. Those figures are the conventional standard-error bands, and they are the
+optimistic version: the inverted intervals in
+Table~\ref{tab:exposure-design}, which are what the reported test actually
+supports, are wider still by a large factor.
 
 What can be said is narrower than "exposure is flat in Portugal". It is that
 minimum-wage incidence within the sectors where a comparable bite is observed
@@ -301,6 +335,119 @@ policy which always moves in the same month cannot be separated from that month
 without discarding the variation that identifies it. The point generalises to
 any country that updates its wage floor on a fixed calendar date.
 
+\subsection{The region-by-category design, and the magnitudes that condemn it}
+
+The two designs above fail in different ways, and each failure is what the other
+would need to survive. The exposure design cannot rule out that its estimates
+are driven by tourism cycles and island supply shocks, because with a shock that
+varies only across regions it cannot carry a region-time effect. The
+category-differential design is defeated by the January sales cycle, because
+with a shock that varies only across categories it cannot carry a category-time
+effect. A shock varying on both dimensions can carry both, and that is the case
+for building one.
+
+The fuller exposure is structural rather than reduced-form. Writing $\ell_s$ for
+labour's share of costs in industry $s$ and $\omega_{cs}$ for the share of
+consumption category $c$ supplied by it,
+
+\begin{equation}
+  B_{rc} = \sum_{s} q_{rs}\, b_{s}\, \ell_{s}\, \omega_{cs},
+  \label{eq:structural-exposure}
+\end{equation}
+
+and the regressor is $B_{rc}\,\Delta \log MW^{PT}_t$. An earlier version of this
+paper argued that the two new terms could not help, since both are national. That
+was a reasoning error rather than a data problem: with $\alpha_{rc}$,
+$\lambda_{rt}$ and $\mu_{ct}$ absorbed, what identifies the coefficient is the
+non-additive part of $B$, and a national factor enters it through its product
+with regional composition. Composition and the bridge are not proportional to one
+another, so the product is not additively separable and does not vanish.
+
+Two things had to be built. The labour-cost share comes from national accounts.
+The bridge does not exist in any published source --- nothing crosses a
+consumption purpose with a producing industry for Portugal --- so it is composed
+from household final consumption by product, taken at basic prices and domestic
+uses, and a concordance recorded with its reasoning in
+\texttt{config/consumption\_bridge.yaml}. Both choices about the source matter
+more than the concordance does. At purchasers' prices the retail margin on a
+good is credited to the industry that made it rather than the one that sold it,
+which moves the wage exposure of the shopping basket between industries; and a
+quarter of Portuguese household spending is imported content or product taxes,
+with no Portuguese producing industry behind it at all.
+
+What the design has is smaller than the measure suggests. Because the statutory
+change is common, the region-time effects remove the row means of $B$ and the
+category-time effects its column means, so the identifying variation is the
+double-demeaned remainder: \StructuralIdentifyingSpread{}~percentage points
+across \StructuralCells{} region-category-months in
+\StructuralClusters{} regions. Table~\ref{tab:structural-design} reports it.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Cumulative price response to the statutory change interacted with
+  region-by-category structural exposure, equation~\eqref{eq:structural-exposure}.
+  Region-category, region-time and category-time fixed effects, clustered on
+  region. The coefficient is on an exposure index rather than a cost share and
+  is not interpretable on its own; the text scales it into points.}
+  \label{tab:structural-design}
+  \input{tables/structural_design}
+\end{table}
+
+It is the only design in this paper that rejects anything.
+\StructuralBootstrapSignificant{} of the \StructuralHorizons{} horizons are
+significant at five per cent by the bootstrap, at
+$p=\ $\StructuralMinBootstrapP{}, and \StructuralHolmSignificant{} survive the
+Holm correction across the horizon family --- the same correction, for the same
+reason, that leaves nothing standing in the regional design.
+
+We would not report those horizons as a finding even had they survived it, and
+the reason is a magnitude rather than a $p$-value. The coefficient cannot be
+read directly. The exposure weights each industry by the region's employment
+share in it, which is what supplies the regional variation and also means it is
+not a cost share but a fraction of one; the fraction runs from under a hundredth
+to two fifths across cells, so no single rescaling makes the coefficient
+interpretable. What is interpretable is the response it implies. Scaled into
+points, the estimate at \StructuralPeakHorizon{}~months gives a differential
+price response of \StructuralPeakResponsePP{}~percentage points between the most
+and least exposed cells for a \StructuralRisePct{}~per cent statutory rise.
+
+That figure can be checked against a ceiling the design itself supplies. The
+most minimum-wage-intensive consumption category has
+\StructuralCostShareCeilingPct{}~per cent of its costs in minimum-wage labour,
+so if every euro of that cost reached prices, a \StructuralRisePct{}~per cent
+rise could move it by at most \StructuralPassThroughCeilingPP{}~points relative
+to a category with no exposure at all. \StructuralAboveCeiling{} of the
+\StructuralHorizons{} horizons imply more than that, including both of the
+significant ones. Those estimates are not large, they are impossible: no
+allocation of the wage bill produces them. The profile alternates sign between
+adjacent horizons as well, which no cumulative response function does, and the
+interval at the peak, \StructuralPeakIntervalLower{} to
+\StructuralPeakIntervalUpper{}, excludes zero and every attainable value with it.
+
+That diagnosis is one this paper has already applied once. An earlier version of
+the regional design returned a peak implying prices rising by more than the
+shock that caused them and was rejected on exactly this ground. The same
+standard applies here, and the fuller design fails it in the same way.
+
+The falsification test does not rescue the estimates, and it is worth saying why
+it cannot. The \StructuralPreTrendLeads{} leads jointly
+\StructuralPreTrendRejects{} the null, at $p=\ $\StructuralPreTrendP{}. Passing
+a pre-trend test establishes that the leads carry no signal; it says nothing
+about whether the contemporaneous coefficient is a magnitude the economics
+permits. A design can be clean on timing and still be dividing by a number close
+to zero, and the identifying spread of
+\StructuralIdentifyingSpread{}~percentage points is that number.
+
+The conclusion is therefore the same as the other two designs reach, arrived at
+from the opposite direction. The exposure design fails to reject anything and
+cannot bound the coefficient; this one rejects at two horizons and bounds it away
+from every value pass-through could take. Neither is evidence about prices in
+Portugal. What the fuller design does settle is a question the paper could not
+otherwise answer: the binding constraint is not the missing structure. We built
+the structure, it absorbs the confounds the other designs are exposed to, and it
+still cannot identify a price response, because policy is assigned to nine
+regions and no amount of consumption detail adds a tenth.
+
 \subsection{What would change the conclusion}
 
 An earlier version of this section named registering Madeira's missing acts as
@@ -314,12 +461,30 @@ improved the point estimates and did not change the conclusion, which is what
 one should expect when the binding constraint is that there is one treated
 region rather than that there are too few dates.
 
+A second prediction has since been tested and it failed in the more useful
+direction. An earlier version argued that building the structural
+region-by-category exposure would not help, because the terms it adds are
+national. The reasoning was wrong, the design was built, and it does what the
+argument for it said it would: it carries region-time and category-time effects
+together, so it is exposed to neither the island supply shocks that threaten the
+exposure design nor the seasonal cycle that defeats the category one. It still
+cannot identify a price response, and it fails in a way that is diagnostic
+rather than merely inconclusive, implying differential responses larger than
+complete pass-through of the whole minimum-wage cost bill could produce.
+Removing the confounds did not help because the confounds were not the
+constraint.
+
 That leaves two things, in descending order of value.
 Minimum-wage coverage published by NUTS~II region and economic activity jointly
 would remove the assumption the exposure measure rests on and, more importantly,
 could widen a spread that industry mix alone cannot. And a longer regional price
 series at consumption-purpose detail would allow pre-trend testing over a window
 long enough to be informative.
+
+Neither would address what both failed designs point at. Policy is assigned to
+nine regions and one of them supplies the divergence, so inference clusters on
+nine however finely the panel is cut. A third design with more structure would
+add cells and not clusters, which is what this one demonstrated.
 
 A fourth would help the exposure design without rescuing it. The published bite
 dates from \ExposureBitePeriod{} and so post-dates the 2015 restart of statutory

@@ -55,9 +55,22 @@ paper:
 	# precedes every shock it is used to estimate. The default round post-
 	# dates the window and the builder refuses it.
 	poetry run ptmw build regional-exposure --bite-period 2015-10 --first-shock-year 2016
+	# The last term the region-by-category exposure needs. Read at basic prices
+	# and domestic uses: at purchasers' prices a good's retail margin is credited
+	# to the industry that made it, and including imports credits Portuguese
+	# employment with costs incurred abroad.
+	poetry run ptmw build consumption-bridge
+	# The region-by-category exposure, which needs the bridge above. Same
+	# predetermination rule as the shift-share measure: exposure must precede
+	# every shock it is used to estimate.
+	poetry run ptmw build structural-exposure --first-shock-year 2016
 	poetry run ptmw analyse macro
 	poetry run ptmw analyse pass-through
 	poetry run ptmw analyse exposure-design
+	# The three-way design is large --- one dummy per region-month and per
+	# category-month --- so this is the slowest step in the pipeline, at about a
+	# minute per horizon.
+	poetry run ptmw analyse structural-design
 	poetry run ptmw analyse exposure-robustness
 	# LaTeX resolves citations and cross-references across passes, and bibtex
 	# runs between them. A single pass leaves the bibliography empty and every

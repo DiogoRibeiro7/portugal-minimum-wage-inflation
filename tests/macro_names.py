@@ -34,6 +34,7 @@ from pt_mw_inflation.analysis.outputs import (
     write_pre_trend_macros,
     write_regional_premium_macros,
     write_seasonality_macros,
+    write_structural_design_macros,
 )
 from pt_mw_inflation.processing.exposure import measure_variation_strength
 from pt_mw_inflation.processing.pass_through import SeasonalConfound
@@ -58,7 +59,13 @@ def _macro_frame() -> pd.DataFrame:
 
 
 def _estimates() -> pd.DataFrame:
-    """Two horizons carrying every column the identification writer reads."""
+    """Two horizons carrying every column the identification writer reads.
+
+    The inverted interval is included because the manuscript now leads with it.
+    A writer that emits interval macros only when the estimator produced them
+    would otherwise define nothing here, and the prose citing them would fail
+    this check rather than the pipeline being fixed.
+    """
     return pd.DataFrame(
         {
             "horizon": [0, 1],
@@ -71,6 +78,9 @@ def _estimates() -> pd.DataFrame:
             "observations": [900, 900],
             "clusters": [9, 9],
             "bootstrap_exhaustive": [True, True],
+            "interval_lower": [-0.11, 0.03],
+            "interval_upper": [0.32, 0.40],
+            "interval_bounded": [True, True],
         }
     )
 
@@ -127,6 +137,12 @@ def definable_macros(directory: Path) -> set[str]:
         ),
         write_regional_premium_macros(_wage_panel(), directory / "premium.tex"),
         write_exposure_design_macros(_estimates(), directory / "exposure_design.tex"),
+        write_structural_design_macros(
+            _estimates(),
+            directory / "structural_design.tex",
+            identifying_spread=1.92,
+            cost_share_ceiling=0.1127,
+        ),
         write_pre_trend_macros(
             JointTest(
                 statistic=7332.0,
@@ -149,6 +165,18 @@ def definable_macros(directory: Path) -> set[str]:
             ),
             directory / "exposure_pre_trend.tex",
             prefix="Exposure",
+        ),
+        write_pre_trend_macros(
+            JointTest(
+                statistic=23.0,
+                p_value=0.646,
+                restrictions=5,
+                clusters=9,
+                draws=512,
+                exhaustive=True,
+            ),
+            directory / "structural_pre_trend.tex",
+            prefix="Structural",
         ),
         write_seasonality_macros(
             SeasonalConfound(

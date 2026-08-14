@@ -161,6 +161,10 @@ employment shares and sweeping plausible bridges:
 | Diffuse | 7 per cent | 0.2 points |
 
 against 4.1 points for the region-only measure the paper currently estimates.
+**That last figure is not comparable to the others and should not be used as the
+benchmark**: it comes from the same simulation, with labour shares drawn from a
+uniform and no bite at all. On the real terms the region-only measure gives 1.4
+points. The section below, on the bridge as built, has the numbers that matter.
 So the answer depends entirely on how concentrated the consumption-to-industry
 bridge is. A diffuse bridge is hopeless; a concentrated one gives *more*
 identifying spread than the current design, over 117 region-category cells
@@ -188,46 +192,247 @@ concordance, and the concordance involves judgement that should be recorded
 rather than buried. The honest position is that the design is worth attempting
 and was previously dismissed for a bad reason.
 
+## The inverted interval, made usable and reported
+
+This was the first of the two items left by the external review, and it is done.
+The interval is now beside the p-value in `regional_design.tex` and
+`exposure_design.tex`, and the manuscript leads with it. What the work turned up
+along the way is worth more than the speed-up.
+
+**The projection was the smaller half of the cost.** The plan recorded here was
+to reuse `solve(X'X, X')` across candidates, as `joint_wald_test` already does.
+That was right but incomplete: on the regional design the pseudo-inverse cost
+about a second per candidate and the *second* least-squares solve — the fit of
+the reduced design, which imposes the null — cost twelve. Both depend only on
+the design, but the second does not need computing at all. Frisch-Waugh gives
+the restricted fit from the full projection directly,
+
+```text
+restricted_fit = X b - b_t * x_perp
+```
+
+and the projector already holds `x_perp`: the target row of `(X'X)^-1 X'` is
+`x_perp / (x_perp' x_perp)`. Twelve seconds became two milliseconds.
+
+**The sign space is smaller than the number of draws.** The wild *cluster*
+bootstrap gives each cluster's whole residual block one sign, so every resampled
+outcome — all 512 of them — is a combination of the same ten vectors: the
+restricted fit and the residuals masked to one cluster at a time. Projecting
+those ten and recombining is not an approximation to the per-draw loop, it is
+the same arithmetic with the shared work done once. A horizon's interval takes
+under two seconds against about fifty minutes for the design; the ordinary
+bootstrap p-value went from ten seconds to under a third of one.
+
+**A tie was being settled by rounding, and it moved published numbers.** Making
+the draws cheap made a latent defect visible. The enumerated sign space contains
+the all-positive vector, which rebuilds the original sample exactly, so its
+statistic *is* the observed statistic and must count — and because the
+statistics are odd in the sign vector, so must its negation. Both were being
+compared with a bare `>=` against a value computed by a different route, so
+whether they counted depended on which way the last bits fell. On horizons where
+whole clusters contribute no variation each distinct statistic repeats and the
+effect was larger still: eight draws of 512 at one horizon. The symmetry is now
+imposed rather than recomputed, the tie is settled by a measured tolerance, and
+every bootstrap p-value in the paper moved by up to 0.016. No conclusion moved;
+the before-and-after values are in the changelog.
+
+**The search range was built from the statistic the module distrusts.** The
+range was quoted in cluster-robust standard errors, and it failed in exactly the
+direction that matters: where the clustered error most understates the
+uncertainty, the bootstrap interval is widest and the range built from it is
+narrowest. At impact on the regional design a t of 8.2 carries a bootstrap p of
+0.23, so every candidate within six standard errors survived and the search
+never reached zero. Reported as it stood, the table would have shown a tight
+interval excluding zero beside a p-value of 0.23. The search now widens until
+the interval closes, and says so when it cannot.
+
+**What the intervals show.** The exposure design's widest runs from -73.7 to
+64.7. It admits full pass-through, sixty times full pass-through, and the same
+magnitudes negative. That is the point of reporting it: a table of nulls cannot
+distinguish a design that found no effect from one that could not have found
+any, and this one is emphatically the second.
+
+## The consumption bridge, built, and what it turned out to be
+
+The gate was that the design is worth attempting only if the real bridge is
+concentrated. It is built, the answer is that it is moderately concentrated
+rather than diffuse, and the gate passes. `config/consumption_bridge.yaml`
+records the concordance, `data/supply_use.py` the measurement, and
+`docs/consumption_bridge_feasibility.py` reproduces the numbers below.
+
+**The gate, answered.** Against simulated bridges the sweep gave 6.77 points
+when concentrated, 2.22 moderately so, and 0.23 when diffuse. The real bridge
+gives **2.31**, and 2.00 to 2.89 across the three defensible ways of allocating
+the trade margin. It sits at the moderate end and nowhere near the diffuse one,
+so the design is worth estimating.
+
+**The benchmark in the table above was wrong, and flattering to the wrong side.**
+That table quotes 4.13 points for the region-only measure the paper estimates,
+and it is not comparable: it came from the same simulation, which drew labour
+shares from a uniform and left the bite out altogether. Recomputed on the real
+bite and the real labour shares, the region-only measure gives **1.40** points.
+So the fuller design does not deliver half of what the current one has, as the
+old comparison implied; it delivers 1.4 to 1.7 times as much depending on the
+coverage weighting, across 117 region-category cells rather than 9 regions. Two
+numbers from different generating processes were being compared as though they
+were the same quantity.
+
+**What the measurement decided, more than the concordance did.** Two arguments
+to the use-table request move the answer further than any judgement in the
+concordance.
+
+The table has to be read at *basic* prices. At purchasers' prices the retail
+margin on a loaf of bread sits inside "food products", so the shelf price is
+credited to the industry that baked it rather than the one that sold it. The two
+conventions describe Portuguese consumption differently enough to change which
+industry the shopping basket's wage exposure belongs to: food, beverages and
+tobacco are 17.0 per cent of the basket under one and 7.9 under the other, while
+wholesale and retail trade go from almost nothing to 18.6. Retail is
+minimum-wage intensive and manufacturing much less so.
+
+And it has to be read at *domestic* uses. A Portuguese wage rise does not raise
+the cost of the imported content of a television. Textiles and apparel are 7.4
+per cent of the basket at purchasers' prices including imports and 2.0 per cent
+of domestic content at basic prices, because most of what Portugal wears is
+imported and most of what its textile industry makes is exported.
+
+**What no concordance can reach.** Domestic content at basic prices is 91.0 of
+the 121.9 billion euro Portuguese households spent in 2015. The remaining
+quarter is imported content (12.2 per cent) and taxes less subsidies on products
+(13.2), and neither has a Portuguese producing industry behind it. That is a
+ceiling on the whole exercise and it is a property of the economy rather than of
+the data.
+
+**The rule that works against the design, kept anyway.** Wholesale and retail
+trade are nearly a fifth of domestic consumption at basic prices, and nobody
+buys retail trade services as such: the margin is earned on the goods it
+distributes. Spreading it across categories in proportion to their goods content
+is what puts retail employment behind the basket, and it is also what makes the
+bridge more diffuse, because it drops a large common block of one industry into
+every goods-carrying category, which is exactly the additive structure the fixed
+effects absorb. Leaving the margin unallocated would raise the identifying
+spread from 2.31 to 2.89 and would be indefensible. The variants are named in
+the config and measured in the feasibility script rather than chosen quietly.
+
+**What the ten-sector ceiling costs.** The regional accounts publish ten
+activity groups, and one of them carries trade, transport, accommodation and
+food service together. No concordance can separate a retail margin from a
+restaurant meal, so the two categories where a minimum wage should bite hardest
+load on the same column of `Q`. Two categories come out identical: alcohol and
+tobacco, and clothing and footwear, both being manufactured goods plus a
+proportional margin, contribute one distinct row between them.
+
+**What it does not fix.** Inference clusters on region because policy is
+assigned by region, and going from 9 regions to 117 region-category cells adds
+observations within clusters rather than clusters. The binding constraint the
+rest of the paper documents — few clusters, one genuinely treated region — is
+untouched by this design.
+
+What it does buy is the fixed effects. The design carries `lambda[r,t]` and
+`mu[c,t]`, so region-time shocks are absorbed: tourism cycles, transport costs
+and island-specific supply shocks, which the manuscript names as the main threat
+to comparing the autonomous regions with the mainland, no longer enter the
+coefficient. The category-time effects absorb the January sales cycle that
+defeated the category-differential design. That, rather than the wider spread,
+is the reason to estimate it.
+
+## The region-by-category design, estimated, and what disqualifies it
+
+Built and estimated. `ptmw build structural-exposure` composes it and
+`ptmw analyse structural-design` estimates it, absorbing region-category,
+region-time and category-time effects together. It is the only design in the
+paper that rejects anything, and it is disqualified by its own magnitudes.
+
+**The result.** Two of seven horizons reject at five per cent by the bootstrap,
+at p = 0.016 and 0.027. None survives the Holm correction across the horizon
+family, whose smallest adjusted value is 0.109. The joint pre-trend test over
+five leads does not reject, at p = 0.646, which is the most comfortable pass any
+design in this paper achieves.
+
+**What condemns it is the scale, not the significance — and the first version of
+this entry got the scale wrong.** I wrote that the regressor is a cost share
+times a log wage change, so complete pass-through is a coefficient of one and
+13.9 is fourteen times it. That is false, and it was nearly published. The
+exposure weights each industry by the region's *employment share* in it, which is
+what supplies the regional dimension and is also a fraction summing to one across
+industries, so `B` is a cost share scaled down by that weight. The ratio of the
+two runs from 0.009 to 0.418 across cells, median 0.21, so a coefficient of one
+is nowhere near complete pass-through and — the part that matters — there is no
+fixed factor that would convert it, because the scaling differs cell by cell.
+
+The check that does work needs no unit assumption, because it puts both sides in
+points. At eighteen months the estimate implies a differential price response of
+2.7 percentage points between the most and least exposed cells for a ten per cent
+statutory rise. The most minimum-wage-intensive consumption category has 15 per
+cent of its costs in minimum-wage labour, so if every euro of that reached prices
+a ten per cent rise could move it by at most 1.5 points against a category with
+none. Three of the seven horizons imply more than that ceiling, including both
+significant ones. Those estimates are not large, they are unattainable. The
+profile also alternates sign between adjacent horizons, which no cumulative
+response function does.
+
+`structural_exposure` now carries `category_cost_share` for exactly this reason:
+the ceiling is a computed quantity rather than a remembered one, and the
+exposure's own docstring says it is not a cost share so the next reader does not
+repeat the error.
+
+**The pre-trend pass is not a defence, and the reason generalises.** Passing a
+lead test establishes that the leads carry no signal. It says nothing about
+whether the contemporaneous coefficient is a magnitude the economics permits. A
+design can be clean on timing and still be dividing by a number close to zero,
+and the identifying spread of 1.92 points is that number. A falsification battery
+that tests only timing will pass a design that is failing on scale.
+
+**The identifying spread is 1.92 points, not the 2.31 the feasibility script
+first gave.** The difference is the coverage weighting: `structural_exposure`
+multiplies each activity's contribution by the share of its employment the bite
+was actually measured on, and the script's own arithmetic did not. The
+production measure is the conservative one and it is the one to quote; both are
+far above the diffuse case that would have stopped the work.
+
+The script now calls `structural_exposure` for its headline rather than
+recomputing, so there is one number and one code path. That fix was itself
+instructive: passing the bite as a bare column instead of the full frame silently
+drops `measured_employment_share` and turns the coverage weighting off, which
+reproduces 2.31 while looking like it is calling the production builder. A
+function whose behaviour depends on whether an optional column survived a
+`set_index` is a trap, and the comment at the call site now says so.
+
+**What the exercise settles.** The paper's causal layer rests on the claim that
+the binding constraint is the assignment of policy to nine regions, not any
+missing structure. That claim was previously an argument. It is now a result: the
+structure was built, it absorbs the island supply shocks the exposure design is
+exposed to and the seasonal cycle that defeats the category design, and the
+answer did not improve. Removing the confounds did not help because the confounds
+were never the constraint. A design with more structure adds cells and not
+clusters.
+
+**A performance note worth keeping.** The three-way design carries 2,695 columns
+against 12,077 rows, and estimating it exposed that each horizon was paying for
+its decomposition four times over: once for the point estimate through a
+least-squares solve that alone cost about ten minutes at this size, once for the
+cluster-robust variance, once for the bootstrap and once for the interval.
+`bootstrap_with_interval` pays for it once. That took the design from
+uncomputable to twenty-two minutes, and it also closed a gap in the reporting:
+the estimate printed beside a bootstrap p-value is now the estimate that p-value
+was computed from by construction rather than by coincidence.
+
 ## Open work, as of August 2026
 
-Two items remain from the external review. Both are specified rather than vague,
-and neither depends on anything in a conversation.
+Nothing is specified and outstanding. The two items the external review left have
+both been carried through, and the third that fell out of the second --- building
+and estimating the region-by-category design --- is done.
 
-### Make the inverted interval usable, then report it
+What remains is not work on this repository but two data dependencies that only
+their publishers can lift, both recorded in `report/sections/robustness.tex`:
+minimum-wage coverage published by NUTS II region and economic activity jointly,
+which would remove the exposure measure's maintained assumption and could widen a
+spread that industry mix alone cannot; and a longer regional price series at
+consumption-purpose detail, which would allow pre-trend testing over an
+informative window.
 
-`invert_bootstrap_interval` in `analysis/inference.py` is correct and tested: it
-builds a confidence interval by inverting the restricted bootstrap test, so the
-interval and the reported p-value agree by construction. An earlier attempt that
-resampled around the estimate instead was discarded because it declared horizons
-significant that the null-imposed test does not reject.
-
-It is not wired into the pipeline because it is too slow. Each candidate value
-calls the bootstrap afresh, and each call rebuilds the projection of a design
-carrying one dummy per region-category and per month, so a seven-horizon path
-costs hundreds of pseudo-inverses and does not finish in ten minutes.
-
-The fix is already implemented once in the same file. `joint_wald_test`
-precomputes `solve(X'X, X')` and reuses it across bootstrap draws, because only
-the outcome changes; the same is true across inversion candidates. After that,
-the interval belongs beside the p-value in `regional_design.tex` and
-`exposure_design.tex`, and the manuscript should lead with it, because an
-interval answers the question a null p-value cannot.
-
-### Build the consumption bridge
-
-`data/labour_shares.py` supplies one of the two terms the region-by-category
-exposure needs, validated against Portugal's economy-wide labour share of 0.504.
-The other is the production-to-consumption bridge: which industries supply each
-COICOP category.
-
-That needs supply-use tables and a COICOP-to-CPA concordance. The concordance
-involves judgement, and this project's convention is that judgement is written
-down rather than buried in a lookup table, so the mapping should be a documented
-configuration file in the manner of `config/minimum_wage_bite.yaml` rather than a
-dictionary in code.
-
-Before building it, read the section above on the reasoning error, and run
-`docs/exposure_separability.py`: the design is worth attempting only if the
-bridge is concentrated, and the sweep says how much depends on that. A diffuse
-bridge yields an identifying spread of a fifth of a percentage point and is not
-worth the work.
+Neither addresses the constraint all three designs now point at. Policy is
+assigned to nine regions and one supplies the divergence, so inference clusters
+on nine however finely the panel is cut. Anyone tempted to add structure to fix
+that should read the section above first: it was tried, and the answer is that
+structure adds cells rather than clusters.

@@ -177,6 +177,27 @@ def test_a_shared_writer_names_the_command_that_invoked_it(tmp_path: Path) -> No
     assert "ptmw analyse exposure-design" in banner
     assert "ptmw analyse pass-through" not in banner
 
+    # The third time, and it was here: the design-table writer took the argument
+    # and never read it, so every exposure table shipped naming the command for
+    # the regional one. The docstring above claimed this writer had been fixed.
+    from pt_mw_inflation.analysis.outputs import write_regional_design_table
+
+    estimates = pd.DataFrame(
+        {
+            "horizon": [0],
+            "coefficient": [0.12],
+            "p_value_clustered": [0.0002],
+            "p_value_bootstrap": [0.238],
+            "p_value_bootstrap_holm": [1.0],
+        }
+    )
+    table = write_regional_design_table(
+        estimates, tmp_path / "c.tex", command="ptmw analyse exposure-design"
+    ).read_text(encoding="utf-8")
+
+    assert "ptmw analyse exposure-design" in table
+    assert "ptmw analyse pass-through" not in table
+
 
 def test_a_prefixed_writer_does_not_collide_with_the_unprefixed_one(tmp_path: Path) -> None:
     """Two designs must emit distinct quantities, not overwrite each other.

@@ -175,6 +175,19 @@ def construct_cost_exposure(
 ) -> pd.DataFrame:
     """Map industry minimum-wage exposure into consumption-category cost exposure.
 
+    **This is not the path the pipeline takes**, and the difference is the first
+    argument. It wants a bite that varies by *region* and industry, which is the
+    measure no Portuguese source publishes and whose absence is the constraint
+    the whole exposure design works around. Nothing in `ptmw` calls this;
+    :func:`structural_exposure` builds the region-by-category measure that is
+    actually estimated, substituting regional employment composition for the
+    regional bite this function assumes.
+
+    It is kept, and kept tested, because it states what the design would be if
+    the bite were published by region: the shift-share is a workaround, and
+    deleting the thing it works around would leave that invisible. A reader
+    looking for the estimated measure wants :func:`structural_exposure`.
+
     Args:
         bite: Columns `region`, `industry`, `reference_period`, `minimum_wage_bite`.
         labour_share: Columns `industry`, `labour_cost_share`.
@@ -888,3 +901,195 @@ def select_snapshot(registry: dict[str, Any], period: str | None = None) -> dict
         "national_total": snapshot.get("national_total"),
     }
     return selected
+
+
+@dataclass(frozen=True)
+class StructuralCoverage:
+    """What the region-by-category exposure was built on, and what it missed.
+
+    Attributes:
+        measured_share: Share of the consumption bridge's weight that reaches an
+            activity carrying both a bite and a labour share. The rest
+            contributes nothing, and it is not spread evenly across categories.
+        unmeasured_activities: Activities absent from one term or the other,
+            with which term is missing.
+        identifying_spread: Range of the double-demeaned exposure matrix, in
+            percentage points. This, and not the raw spread, is what survives
+            region-time and category-time effects.
+        coverage_weighted: Whether the bite carried the share of each group's
+            employment it was measured on. False means every group was treated
+            as fully surveyed, which overstates the exposure of the partly
+            surveyed ones and is usually a caller that passed the bite column
+            without the frame around it.
+    """
+
+    measured_share: float
+    unmeasured_activities: tuple[tuple[str, str], ...]
+    identifying_spread: float
+    coverage_weighted: bool
+
+
+def structural_exposure(
+    shares: pd.DataFrame,
+    activity_bite: pd.DataFrame,
+    labour_share: pd.DataFrame,
+    consumption_bridge: pd.DataFrame,
+    *,
+    share_column: str = "employment_share",
+) -> tuple[pd.DataFrame, StructuralCoverage]:
+    r"""Build the region-by-category exposure from all four of its terms.
+
+    .. math::
+
+        B_{rc} = \sum_s q_{rs}\, b_s\, \ell_s\, \omega_{cs}
+
+    Three of the terms are national and only the composition varies by region.
+    An earlier version of this project dismissed the two extra terms on the
+    grounds that national factors cannot create regional variation, which
+    confused "these factors do not vary across regions" with "their product does
+    not vary across region-category cells". Once region-time and category-time
+    effects are absorbed, what identifies the coefficient is the non-additive
+    part of this matrix, and the national terms enter it.
+
+    The quantity that matters is therefore reported alongside the measure. The
+    raw spread of :math:`B` overstates what the design has, because the fixed
+    effects remove its row and column means; `identifying_spread` is what is
+    left after that removal.
+
+    Args:
+        shares: Regional employment shares by activity.
+        activity_bite: National bite by activity, from
+            :func:`activity_bite_from_registry`.
+        labour_share: Columns `activity` and `labour_cost_share`.
+        consumption_bridge: Columns `category`, `industry` and
+            `production_weight`, from
+            :func:`~pt_mw_inflation.processing.consumption_bridge.build_consumption_bridge`.
+        share_column: Column holding the employment share.
+
+    Returns:
+        One row per region and category with `structural_exposure`, and a record
+        of the activities the measure could not reach.
+
+    Raises:
+        ExposureError: If a required column is missing, if the bridge violates
+            its contract, or if nothing merges, which is what an activity-coding
+            mismatch between the four sources looks like.
+    """
+    _require_columns("shares", shares, frozenset({"region", "activity", share_column}))
+    _require_columns("activity_bite", activity_bite, frozenset({"industry", "minimum_wage_bite"}))
+    _require_columns("labour_share", labour_share, frozenset({"activity", "labour_cost_share"}))
+    validate_bridge(consumption_bridge)
+
+    bite = activity_bite.set_index("industry")["minimum_wage_bite"]
+
+    # A group can be only partly surveyed, and `activity_bite_from_registry`
+    # reports how much of it was. Weighting by that is what stops a bite
+    # measured on part of a group being credited to all of it.
+    #
+    # The column is optional because a caller may supply a bite from elsewhere,
+    # but its absence is recorded rather than absorbed. Passing the bite as a
+    # bare column instead of the full frame drops it silently and turns the
+    # weighting off, which is worth 0.4 of a point of identifying spread here
+    # and looks identical to having asked for it.
+    coverage_weighted = "measured_employment_share" in activity_bite.columns
+    measured_cover = (
+        activity_bite.set_index("industry")["measured_employment_share"]
+        if coverage_weighted
+        else pd.Series(1.0, index=activity_bite["industry"])
+    )
+    labour = labour_share.set_index("activity")["labour_cost_share"]
+
+    # An activity missing either term contributes nothing rather than being
+    # dropped or imputed. Both absences are real and neither is an error: the
+    # survey excludes agriculture, so it has no bite, and real estate value
+    # added is imputed rent, which employs nobody, so its labour share is
+    # suppressed as an artefact. Treating them as zero exposure is the
+    # conservative reading, and which activities it applies to is reported.
+    activities = sorted(set(shares["activity"].astype(str)))
+    unmeasured: list[tuple[str, str]] = []
+    weight: dict[str, float] = {}
+    for activity in activities:
+        this_bite = float(bite.get(activity, float("nan")))
+        this_labour = float(labour.get(activity, float("nan")))
+        missing = []
+        if not np.isfinite(this_bite):
+            missing.append("bite")
+        if not np.isfinite(this_labour):
+            missing.append("labour share")
+        if missing:
+            unmeasured.append((activity, " and ".join(missing)))
+            weight[activity] = 0.0
+            continue
+        weight[activity] = this_bite * this_labour * float(measured_cover.get(activity, 1.0))
+
+    composition = shares.assign(
+        _weight=shares["activity"].astype(str).map(weight).astype(float),
+    )
+    composition["_contribution"] = composition[share_column] * composition["_weight"]
+
+    merged = composition.merge(
+        consumption_bridge, left_on="activity", right_on="industry", validate="many_to_many"
+    )
+    if merged.empty:
+        raise ExposureError(
+            "no activities merged between composition and the bridge; "
+            "check the activity coding on both sides"
+        )
+
+    merged["_cell"] = merged["_contribution"] * merged["production_weight"]
+    exposure = merged.groupby(["region", "category"], as_index=False)[["_cell"]].sum()
+    exposure = exposure.rename(columns={"_cell": "structural_exposure"})
+
+    # The national minimum-wage cost share of each category, carried alongside
+    # because it is what makes an estimate readable.
+    #
+    # The exposure above is *not* a cost share and must not be read as one. It
+    # weights each industry by the region's employment share in it, which is
+    # what introduces the regional dimension the design needs, and that weight
+    # is a fraction summing to one across industries. So the exposure runs about
+    # a third of the cost share, and a coefficient of one on it is not complete
+    # pass-through. The cost share here is on the scale where it would be:
+    # sum_s w[c,s] b[s] l[s], the share of category c's costs that is
+    # minimum-wage labour, with no regional weighting at all.
+    cost_share = (
+        consumption_bridge.assign(
+            _unit=consumption_bridge["industry"]
+            .astype(str)
+            .map(lambda activity: weight.get(activity, 0.0))
+        )
+        .assign(_x=lambda frame: frame["production_weight"] * frame["_unit"])
+        .groupby("category")["_x"]
+        .sum()
+    )
+    exposure["category_cost_share"] = exposure["category"].map(cost_share).astype(float)
+    exposure["exposure_definition"] = "structural_region_category"
+
+    # The share of the bridge's weight that reaches a measured activity. Below
+    # one it means categories are supplied partly by industries this measure
+    # cannot see, and the shortfall differs across categories.
+    reachable = consumption_bridge.assign(
+        _measured=consumption_bridge["industry"]
+        .astype(str)
+        .map(lambda activity: 1.0 if weight.get(activity, 0.0) > 0 else 0.0)
+    )
+    measured_share = float(
+        (reachable["production_weight"] * reachable["_measured"]).sum()
+        / reachable["production_weight"].sum()
+    )
+
+    matrix = exposure.pivot(index="region", columns="category", values="structural_exposure")
+    values = matrix.to_numpy(dtype=float)
+    residual = (
+        values
+        - values.mean(axis=1, keepdims=True)
+        - values.mean(axis=0, keepdims=True)
+        + values.mean()
+    )
+
+    coverage = StructuralCoverage(
+        measured_share=measured_share,
+        unmeasured_activities=tuple(unmeasured),
+        identifying_spread=100.0 * float(residual.max() - residual.min()),
+        coverage_weighted=coverage_weighted,
+    )
+    return exposure, coverage
