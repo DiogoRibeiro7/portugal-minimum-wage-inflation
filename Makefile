@@ -41,6 +41,10 @@ check: lint typecheck test
 # has to run before LaTeX does.
 paper:
 	poetry run ptmw data download-sources
+	# Reports raw inputs whose bytes moved since the manifest was frozen.
+	# Not strict: an upstream revision should be seen and decided on, not
+	# silently block a rebuild.
+	poetry run ptmw data verify-inputs
 	poetry run ptmw data ine-cpi
 	poetry run ptmw data regional-employment
 	poetry run ptmw build minimum-wage

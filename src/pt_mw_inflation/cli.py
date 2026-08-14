@@ -38,6 +38,7 @@ from pt_mw_inflation.data.eurostat_regional import (
     industry_shares,
     require_matched_inputs,
 )
+from pt_mw_inflation.data.freeze import FreezeError, verify_manifest, write_manifest
 from pt_mw_inflation.data.ine import fetch_regional_cpi
 from pt_mw_inflation.data.registry import download_registry
 from pt_mw_inflation.data.worldbank import fetch_indicator
@@ -702,6 +703,68 @@ def analyse_exposure_robustness(
         f"  widest coefficient range: {widest.label} "
         f"[{widest.min_coefficient:.2f}, {widest.max_coefficient:.2f}]"
     )
+
+
+@data_app.command("freeze-inputs")
+def data_freeze_inputs(
+    manifest: Path = typer.Option(
+        Path("config/publication_inputs.json"),
+        help="Committed manifest recording the checksum of every raw input.",
+    ),
+) -> None:
+    """Record the checksums of the raw inputs behind a publishable run."""
+    root = _repo_root()
+    try:
+        frozen = write_manifest(root / "data/raw", root / manifest)
+    except FreezeError as error:
+        raise typer.BadParameter(str(error)) from error
+
+    typer.echo(f"Froze {frozen} inputs to {manifest}")
+    typer.echo("  commit this file; the raw bytes themselves are not distributed")
+
+
+@data_app.command("verify-inputs")
+def data_verify_inputs(
+    manifest: Path = typer.Option(
+        Path("config/publication_inputs.json"),
+        help="Committed manifest to check the working tree against.",
+    ),
+    strict: bool = typer.Option(
+        False, help="Exit non-zero when an input has changed or gone missing."
+    ),
+) -> None:
+    """Report raw inputs that have changed since the manifest was frozen.
+
+    Statistical agencies revise their history. This does not prevent that; it
+    makes it visible at the moment it happens, rather than after a figure in the
+    manuscript has quietly moved.
+    """
+    root = _repo_root()
+    try:
+        report = verify_manifest(root / "data/raw", root / manifest)
+    except FreezeError as error:
+        raise typer.BadParameter(str(error)) from error
+
+    typer.echo(f"Verified {report.verified} inputs against {manifest}")
+    for label, names in (
+        ("changed upstream", report.changed),
+        ("missing locally", report.missing),
+        ("not yet frozen", report.added),
+    ):
+        if names:
+            typer.echo(f"  {len(names)} {label}:")
+            for name in names[:5]:
+                typer.echo(f"    {name}")
+            if len(names) > 5:
+                typer.echo(f"    ... and {len(names) - 5} more")
+
+    if report.changed:
+        typer.echo(
+            "  A changed input means the published numbers were computed from "
+            "different bytes. Re-freeze deliberately, and rebuild the paper."
+        )
+    if strict and not report.clean:
+        raise typer.Exit(code=1)
 
 
 # Kept last on purpose. Every command must be registered before ``app()`` is
