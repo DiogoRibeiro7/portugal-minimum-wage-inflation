@@ -187,3 +187,47 @@ three. Building the bridge means supply-use tables and a COICOP-to-CPA
 concordance, and the concordance involves judgement that should be recorded
 rather than buried. The honest position is that the design is worth attempting
 and was previously dismissed for a bad reason.
+
+## Open work, as of August 2026
+
+Two items remain from the external review. Both are specified rather than vague,
+and neither depends on anything in a conversation.
+
+### Make the inverted interval usable, then report it
+
+`invert_bootstrap_interval` in `analysis/inference.py` is correct and tested: it
+builds a confidence interval by inverting the restricted bootstrap test, so the
+interval and the reported p-value agree by construction. An earlier attempt that
+resampled around the estimate instead was discarded because it declared horizons
+significant that the null-imposed test does not reject.
+
+It is not wired into the pipeline because it is too slow. Each candidate value
+calls the bootstrap afresh, and each call rebuilds the projection of a design
+carrying one dummy per region-category and per month, so a seven-horizon path
+costs hundreds of pseudo-inverses and does not finish in ten minutes.
+
+The fix is already implemented once in the same file. `joint_wald_test`
+precomputes `solve(X'X, X')` and reuses it across bootstrap draws, because only
+the outcome changes; the same is true across inversion candidates. After that,
+the interval belongs beside the p-value in `regional_design.tex` and
+`exposure_design.tex`, and the manuscript should lead with it, because an
+interval answers the question a null p-value cannot.
+
+### Build the consumption bridge
+
+`data/labour_shares.py` supplies one of the two terms the region-by-category
+exposure needs, validated against Portugal's economy-wide labour share of 0.504.
+The other is the production-to-consumption bridge: which industries supply each
+COICOP category.
+
+That needs supply-use tables and a COICOP-to-CPA concordance. The concordance
+involves judgement, and this project's convention is that judgement is written
+down rather than buried in a lookup table, so the mapping should be a documented
+configuration file in the manner of `config/minimum_wage_bite.yaml` rather than a
+dictionary in code.
+
+Before building it, read the section above on the reasoning error, and run
+`docs/exposure_separability.py`: the design is worth attempting only if the
+bridge is concentrated, and the sweep says how much depends on that. A diffuse
+bridge yields an identifying spread of a fifth of a percentage point and is not
+worth the work.
