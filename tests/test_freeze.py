@@ -121,3 +121,52 @@ def test_the_manifest_is_ordered_so_it_diffs_cleanly(tmp_path: Path) -> None:
 
     inputs = json.loads(manifest.read_text(encoding="utf-8"))["inputs"]
     assert list(inputs) == sorted(inputs)
+
+
+def test_an_extraction_stamp_does_not_read_as_a_revision(tmp_path: Path) -> None:
+    """Responses carry the moment they were fetched, and that is not a change.
+
+    The API returns a list whose first element carries the stamp, which is the
+    shape content_digest strips. Statistics Portugal stamps each response with
+    an extraction time, so the
+    raw bytes differ on every fetch while the data is identical. Digesting the
+    bytes directly reported every input as changed on every run, which is not a
+    warning but noise, and noise in a check like this trains its reader to
+    ignore it.
+    """
+    raw = _tree(tmp_path, {})
+    path = raw / "ine" / "cpi.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps([{"DataExtracao": "2026-08-11T10:00:00", "Dados": {"value": 1}}]),
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "config" / "inputs.json"
+    write_manifest(raw, manifest)
+
+    # Same data, fetched again a day later.
+    path.write_text(
+        json.dumps([{"DataExtracao": "2026-08-12T09:30:00", "Dados": {"value": 1}}]),
+        encoding="utf-8",
+    )
+    assert verify_manifest(raw, manifest).clean
+
+
+def test_a_real_revision_behind_a_new_stamp_is_still_caught(tmp_path: Path) -> None:
+    """Stripping the stamp must not strip the signal it was hiding."""
+    raw = _tree(tmp_path, {})
+    path = raw / "ine" / "cpi.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps([{"DataExtracao": "2026-08-11T10:00:00", "Dados": {"value": 1}}]),
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "config" / "inputs.json"
+    write_manifest(raw, manifest)
+
+    path.write_text(
+        json.dumps([{"DataExtracao": "2026-08-12T09:30:00", "Dados": {"value": 2}}]),
+        encoding="utf-8",
+    )
+    report = verify_manifest(raw, manifest)
+    assert report.changed == ["data/raw/ine/cpi.json"]
