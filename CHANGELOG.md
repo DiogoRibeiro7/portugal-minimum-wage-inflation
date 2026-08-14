@@ -12,6 +12,15 @@ was.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-14
+
+Three designs are now estimated rather than argued about, and the paper's causal
+layer reaches a settled conclusion: the binding constraint is that policy is
+assigned to nine regions, not any missing structure.
+
+**This release alters published estimates.** Every bootstrap $p$-value may move
+by up to 0.016, for the reason recorded under `Changed`. No conclusion changes.
+
 ### Added
 
 - Concept and version DOIs from the first Zenodo deposit, recorded in
@@ -288,6 +297,7 @@ citable, licensed, and continuously verified, and does not alter any result.
 - `report/`: LaTeX manuscript skeleton with sections and bibliography.
 - Unit tests for minimum-wage and exposure processing.
 
-[Unreleased]: https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/releases/tag/v0.1.0
