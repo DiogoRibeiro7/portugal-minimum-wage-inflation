@@ -80,10 +80,14 @@ industry and a production-to-consumption bridge:
 shock[r, c, t] = exposure[r, c] * national_minimum_wage_change[t]
 ```
 
-Neither the labour-cost shares nor the bridge exists in this repository. Both
-new terms would be national, so they would vary the shock across consumption
-categories without widening the regional variation that both designs identify as
-the binding constraint.
+Neither the labour-cost shares nor the bridge exists in this repository. An
+earlier version of this README argued that building them would not help, because
+both new terms are national. That was wrong: with region-time and category-time
+effects absorbed, what identifies the coefficient is the non-additive part of the
+region-by-category matrix, which does not vanish. On the observed regional
+composition it can exceed the spread of the region-only measure, and it would
+also absorb the seasonal confound that defeats the category design. See
+`docs/decision_log.md`.
 
 Diagnostics that are implemented: a joint pre-trend test over the leads,
 wild-cluster and randomization inference for the small number of regions, Holm

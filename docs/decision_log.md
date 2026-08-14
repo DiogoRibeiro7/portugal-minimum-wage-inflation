@@ -124,3 +124,66 @@ procedures in `analysis/inference.py` are the minimum standard rather than a
 robustness check. The falsification battery — pre-trends, placebo dating,
 leave-one-region-out — carries correspondingly more weight than it would in a
 design with many clusters.
+
+## The region-by-category exposure, and a claim I got wrong
+
+I twice advised against building the fuller structural exposure
+
+```text
+B[r, c] = sum_s q[r, s] * labour_cost_share[s] * consumption_bridge[c, s]
+```
+
+on the grounds that both new terms are national, so they would vary the shock
+across consumption categories without widening the regional variation that both
+estimated designs identify as the binding constraint. The README said the same.
+
+That reasoning was wrong, and the error is worth recording because it is a
+reasoning error rather than a data problem.
+
+**What survives the fixed effects.** The design is `X[r,c,t] = B[r,c] * g[t]`
+with `g[t]` the common national change, absorbed by `alpha[r,c]`, `lambda[r,t]`
+and `mu[c,t]`. Because `g[t]` is common, the region-time effects remove the row
+means of `B` and the category-time effects remove its column means. What
+identifies the coefficient is therefore the double-demeaned, non-additive part of
+the region-by-category matrix. Writing `B = Q diag(l) W'`, that matrix has rank
+up to the number of sectors and is not additively separable, so the interaction
+does not vanish. My claim that the national terms add nothing confused "these
+factors do not vary across regions" with "their product does not vary across
+region-category cells". Those are different statements.
+
+**How much survives, on the real composition.** Taking the observed regional
+employment shares and sweeping plausible bridges:
+
+| Bridge | Variance surviving | Identifying spread |
+| --- | --- | --- |
+| Concentrated | 26 per cent | 6.8 points |
+| Moderately concentrated | 19 per cent | 2.2 points |
+| Diffuse | 7 per cent | 0.2 points |
+
+against 4.1 points for the region-only measure the paper currently estimates.
+So the answer depends entirely on how concentrated the consumption-to-industry
+bridge is. A diffuse bridge is hopeless; a concentrated one gives *more*
+identifying spread than the current design, over 117 region-category cells
+rather than 9 regions.
+
+Real COICOP categories are closer to the concentrated end than the diffuse one:
+food draws on agriculture, food manufacturing and retail; restaurants on
+accommodation and food service; transport on transport. That is an argument for
+building the bridge, not against.
+
+**And it would fix the seasonality confound.** The category-differential design
+failed because it cannot carry calendar-time effects, so the January sales cycle
+was read as a response to the January statutory rise. This design can carry
+`mu[c,t]`, which absorbs each category's national January movement. What is left
+is the variation of `B[r,c]` across regions within a category-month, which the
+seasonal argument does not touch.
+
+The sweep above is reproducible: run `docs/exposure_separability.py` from the
+repository root against the built regional employment panel.
+
+**What is still unresolved.** The figures above use simulated bridges and
+simulated labour-cost shares; the real ones may be more diffuse than any of the
+three. Building the bridge means supply-use tables and a COICOP-to-CPA
+concordance, and the concordance involves judgement that should be recorded
+rather than buried. The honest position is that the design is worth attempting
+and was previously dismissed for a bad reason.
