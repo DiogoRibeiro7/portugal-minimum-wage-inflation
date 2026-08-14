@@ -584,6 +584,21 @@ def analyse_exposure_design(
     write_regional_design_table(estimates, destination, command="ptmw analyse exposure-design")
     write_exposure_design_macros(estimates, root / "report/tables/exposure_design_macros.tex")
 
+    # The falsification battery applies to this design too. Reporting it for one
+    # design and not the other would let the untested one borrow the tested
+    # one's credibility.
+    exposure_pre_trend = assess_pre_trends(panel, outcome="log_price", shock="exposure_shock")
+    write_pre_trend_macros(
+        exposure_pre_trend,
+        root / "report/tables/exposure_pre_trend_macros.tex",
+        prefix="Exposure",
+        command="ptmw analyse exposure-design",
+    )
+    typer.echo(
+        f"  joint pre-trend test on {exposure_pre_trend.restrictions} leads: "
+        f"p = {exposure_pre_trend.p_value:.3f}"
+    )
+
     exposure_frame = pd.read_parquet(root / exposure)
     contrast = float(
         exposure_frame["regional_bite_exposure"].max()
