@@ -675,3 +675,136 @@ def joint_wald_test(
         draws=int(signs.shape[0]),
         exhaustive=exhaustive,
     )
+
+
+@dataclass(frozen=True)
+class InvertedInterval:
+    """A confidence interval built by inverting the restricted bootstrap test.
+
+    Attributes:
+        coefficient: The point estimate.
+        lower: Smallest value in the grid not rejected.
+        upper: Largest value in the grid not rejected.
+        level: Coverage the interval was built at.
+        bounded: Whether both endpoints fell strictly inside the search grid. A
+            false value means the interval runs past where we looked, so the
+            endpoints are the grid limits rather than the interval's.
+        grid_points: How many candidate values were tested.
+    """
+
+    coefficient: float
+    lower: float
+    upper: float
+    level: float
+    bounded: bool
+    grid_points: int
+
+
+def invert_bootstrap_interval(
+    design: FloatArray,
+    outcome: FloatArray,
+    clusters: npt.NDArray[np.int_],
+    *,
+    target: int,
+    level: float = 0.95,
+    grid_points: int = 41,
+    span: float = 6.0,
+    draws: int = 999,
+    seed: int = 20260814,
+) -> InvertedInterval:
+    """Invert the restricted bootstrap test to obtain an interval.
+
+    The natural way to attach an interval to a bootstrap p-value is to resample
+    around the estimate and take quantiles. With this few clusters that performs
+    badly, and demonstrably so here: a band built that way declared horizons
+    significant that the null-imposed test does not reject. The accuracy of the
+    wild cluster bootstrap comes from imposing the null, and an interval that
+    abandons the null gives up exactly what makes the procedure trustworthy.
+
+    Inversion keeps it. To test :math:`\beta = \beta_0` the candidate effect is
+    subtracted from the outcome and the resulting coefficient is tested against
+    zero by the same restricted bootstrap the paper reports. The interval is the
+    set of candidates not rejected. At :math:`\beta_0 = 0` this reproduces the
+    reported p-value exactly, so the interval and the test cannot disagree.
+
+    Args:
+        design: Regressor matrix including fixed-effect dummies.
+        outcome: Dependent variable.
+        clusters: Integer cluster label per observation.
+        target: Column index of the coefficient of interest.
+        level: Coverage level.
+        grid_points: Candidates tested across the search range.
+        span: Half-width of the search range, in cluster-robust standard errors.
+        draws: Bootstrap draws when the sign space is too large to enumerate.
+        seed: Seed for reproducibility.
+
+    This is correct and, on a design carrying one dummy per region-category and
+    per month, too slow to run in the pipeline as written. Each candidate calls
+    the bootstrap afresh, and each call rebuilds the projection of a design with
+    thousands of columns, so a seven-horizon path costs some hundreds of
+    pseudo-inverses. The fix is the one already applied to
+    :func:`joint_wald_test`: build the projection once and reuse it across
+    candidates, since only the outcome changes. Until that is done this is used
+    on small designs and in tests, and is deliberately not wired into
+    ``make paper``.
+
+    Returns:
+        The interval, with a flag for whether it is bounded by the grid.
+
+    Raises:
+        ValueError: If the level is not a probability, or the grid is too small
+            to describe an interval.
+    """
+    if not 0.0 < level < 1.0:
+        raise ValueError(f"level must lie in (0, 1), got {level}")
+    if grid_points < 3:
+        raise ValueError(f"at least three grid points are required, got {grid_points}")
+
+    design = np.asarray(design, dtype=np.float64)
+    outcome = np.asarray(outcome, dtype=np.float64)
+
+    coefficient, standard_error, _ = clustered_t_statistic(design, outcome, clusters, target)
+    if not np.isfinite(standard_error) or standard_error <= 0:
+        raise ValueError("the coefficient has no usable standard error to search around")
+
+    alpha = 1.0 - level
+    candidates = np.linspace(
+        coefficient - span * standard_error,
+        coefficient + span * standard_error,
+        grid_points,
+    )
+    regressor = design[:, target]
+
+    accepted: list[float] = []
+    for candidate in candidates:
+        # Testing beta = candidate is testing zero once the candidate effect is
+        # removed, which is what lets the reported procedure be reused unchanged.
+        adjusted = outcome - candidate * regressor
+        result = wild_cluster_bootstrap(
+            design, adjusted, clusters, target=target, draws=draws, seed=seed
+        )
+        if np.isfinite(result.p_value) and result.p_value > alpha:
+            accepted.append(float(candidate))
+
+    if not accepted:
+        # Every candidate rejected. Reporting a degenerate interval would read as
+        # extreme precision, when it means the grid missed the region entirely.
+        return InvertedInterval(
+            coefficient=coefficient,
+            lower=float("nan"),
+            upper=float("nan"),
+            level=level,
+            bounded=False,
+            grid_points=grid_points,
+        )
+
+    lower, upper = min(accepted), max(accepted)
+    bounded = lower > candidates[0] and upper < candidates[-1]
+    return InvertedInterval(
+        coefficient=coefficient,
+        lower=lower,
+        upper=upper,
+        level=level,
+        bounded=bounded,
+        grid_points=grid_points,
+    )
