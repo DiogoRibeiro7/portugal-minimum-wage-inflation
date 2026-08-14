@@ -138,6 +138,18 @@ def definable_macros(directory: Path) -> set[str]:
             ),
             directory / "pre_trend.tex",
         ),
+        write_pre_trend_macros(
+            JointTest(
+                statistic=112.0,
+                p_value=0.711,
+                restrictions=5,
+                clusters=9,
+                draws=512,
+                exhaustive=True,
+            ),
+            directory / "exposure_pre_trend.tex",
+            prefix="Exposure",
+        ),
         write_seasonality_macros(
             SeasonalConfound(
                 modal_month=1,
