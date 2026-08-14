@@ -138,3 +138,62 @@ def test_the_base_year_sensitivity_is_generated(tmp_path: Path) -> None:
     # Rebasing on a second year worth half the first doubles the end value.
     assert written["WageToProductivityEnd"] == "25.0"
     assert written["WageToProductivityEndAlt"] == "50.0"
+
+
+def test_a_shared_writer_names_the_command_that_invoked_it(tmp_path: Path) -> None:
+    """A banner naming the wrong command is worse than no banner at all.
+
+    Two designs share the pre-trend writer, and two share the design-table
+    writer. Both defaulted to hardcoding one command, so the file produced by
+    the other told its reader to regenerate it with something that would not
+    produce it --- and, being plausible, would appear to have been followed.
+
+    This has been fixed twice: once in the design-table writer, and again in the
+    pre-trend writer after the same shape was copied. The third time is what
+    this test is for.
+    """
+    from pt_mw_inflation.analysis.inference import JointTest
+    from pt_mw_inflation.analysis.outputs import write_pre_trend_macros
+
+    result = JointTest(
+        statistic=112.0,
+        p_value=0.711,
+        restrictions=5,
+        clusters=9,
+        draws=512,
+        exhaustive=True,
+    )
+
+    default = write_pre_trend_macros(result, tmp_path / "a.tex")
+    named = write_pre_trend_macros(
+        result,
+        tmp_path / "b.tex",
+        prefix="Exposure",
+        command="ptmw analyse exposure-design",
+    )
+
+    assert "ptmw analyse pass-through" in default.read_text(encoding="utf-8")
+    banner = named.read_text(encoding="utf-8")
+    assert "ptmw analyse exposure-design" in banner
+    assert "ptmw analyse pass-through" not in banner
+
+
+def test_a_prefixed_writer_does_not_collide_with_the_unprefixed_one(tmp_path: Path) -> None:
+    """Two designs must emit distinct quantities, not overwrite each other.
+
+    Without the prefix both files define the same macro names, so whichever
+    ran last would silently supply the figures the manuscript attributes to
+    the other design.
+    """
+    from pt_mw_inflation.analysis.inference import JointTest
+    from pt_mw_inflation.analysis.outputs import write_pre_trend_macros
+
+    result = JointTest(
+        statistic=7332.0, p_value=0.109, restrictions=5, clusters=9, draws=512, exhaustive=True
+    )
+    plain = _macros(write_pre_trend_macros(result, tmp_path / "a.tex"))
+    prefixed = _macros(write_pre_trend_macros(result, tmp_path / "b.tex", prefix="Exposure"))
+
+    assert not set(plain) & set(prefixed)
+    assert "PreTrendP" in plain
+    assert "ExposurePreTrendP" in prefixed
