@@ -268,13 +268,22 @@ Zenodo issues two kinds of DOI:
 | DOI | Value | Cite it when |
 | --- | ----- | ------------ |
 | **Concept** | [`10.5281/zenodo.21864603`](https://doi.org/10.5281/zenodo.21864603) | The citation should track the current analysis. Always resolves to the latest version. |
-| **Version** | [`10.5281/zenodo.21864604`](https://doi.org/10.5281/zenodo.21864604) (v0.2.0) | A result must be reproducible exactly. Pins one release. |
+| **Version** | [`10.5281/zenodo.21939240`](https://doi.org/10.5281/zenodo.21939240) (v0.3.0) | A result must be reproducible exactly. Pins one release. |
+
+Which to cite is not a formatting preference here. v0.3.0 changed every bootstrap
+p-value by up to 0.016, so a result quoted against v0.2.0
+([`10.5281/zenodo.21864604`](https://doi.org/10.5281/zenodo.21864604)) does not
+reproduce against v0.3.0. Anything reporting a specific number wants the version
+DOI; anything referring to the analysis in general wants the concept DOI.
 
 Archiving is already enabled: publishing a GitHub release is enough, and Zenodo
 mints a new version DOI under the same concept DOI automatically. When cutting
 a release, bump the version in `pyproject.toml`, `CITATION.cff` and
 `.zenodo.json` together — `.zenodo.json` is what the deposit records, so a
-stale value there mislabels the archive.
+stale value there mislabels the archive. The new version DOI exists only after
+the release is published, so recording it in `CITATION.cff` and in the table
+above is a step that necessarily follows the release rather than accompanying
+it.
 
 `CITATION.cff` and `.zenodo.json` are validated in CI, including a check that
 they agree on title and version, so a release cannot be archived with
