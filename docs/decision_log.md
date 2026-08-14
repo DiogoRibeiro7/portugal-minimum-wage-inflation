@@ -419,20 +419,11 @@ was computed from by construction rather than by coincidence.
 
 ## Open work, as of August 2026
 
-Nothing is specified and outstanding. The two items the external review left have
-both been carried through, and the third that fell out of the second --- building
-and estimating the region-by-category design --- is done.
+None. The two items the external review left have both been carried through, and
+the third that fell out of the second --- building and estimating the
+region-by-category design --- is done and released as v0.3.0.
 
-What remains is not work on this repository but two data dependencies that only
-their publishers can lift, both recorded in `report/sections/robustness.tex`:
-minimum-wage coverage published by NUTS II region and economic activity jointly,
-which would remove the exposure measure's maintained assumption and could widen a
-spread that industry mix alone cannot; and a longer regional price series at
-consumption-purpose detail, which would allow pre-trend testing over an
-informative window.
-
-Neither addresses the constraint all three designs now point at. Policy is
-assigned to nine regions and one supplies the divergence, so inference clusters
-on nine however finely the panel is cut. Anyone tempted to add structure to fix
-that should read the section above first: it was tried, and the answer is that
-structure adds cells rather than clusters.
+What remains is forward-looking rather than a record, so it lives in
+`docs/roadmap.md` and not here. Keeping it in one place is deliberate: this file
+already had two competing figures for the identifying spread at one point, and a
+second copy of the queue is the same failure waiting to happen.

@@ -141,6 +141,8 @@ data/
   external/              Manually supplied public files when an API is unavailable
 docs/
   research_design.md     Identification, estimands, assumptions, robustness
+  decision_log.md        How positions were reached, including the wrong ones
+  roadmap.md             What is left, and what is deliberately not
   data_dictionary.md     Variable definitions and provenance
   literature_map.md      Literature and novelty map
 notebooks/               Exploration only; production results live in src/
