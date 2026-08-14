@@ -59,7 +59,9 @@ Delta_h log(P[r,c,t+h]) = alpha[r,c] + lambda[t]
 
 Ten region-months diverge over the window. Conventional clustered inference calls
 five horizons significant; the wild cluster bootstrap leaves one, and Holm's
-correction across the horizon family leaves none.
+correction across the horizon family leaves none. Every horizon also carries a
+confidence interval built by inverting the bootstrap test rather than from the
+standard error, so the interval and the p-value cannot disagree.
 
 **Shift-share exposure.** Regional industry composition from Eurostat's regional
 accounts is combined with the national minimum-wage bite by activity:
@@ -73,26 +75,44 @@ the October 2015 survey round precedes every shock in the window. The measure
 spans about two percentage points across nine regions, and not one horizon is
 significant even by conventional clustered inference.
 
-**Not built.** A fuller structural exposure would add a labour-cost share by
-industry and a production-to-consumption bridge:
+**Built and estimated.** A fuller structural exposure adds a labour-cost
+share by industry and a production-to-consumption bridge:
 
 ```text
 shock[r, c, t] = exposure[r, c] * national_minimum_wage_change[t]
+exposure[r, c] = sum_s employment_share[r, s] * bite[s]
+                 * labour_cost_share[s] * bridge[c, s]
 ```
 
-Neither the labour-cost shares nor the bridge exists in this repository. An
-earlier version of this README argued that building them would not help, because
-both new terms are national. That was wrong: with region-time and category-time
-effects absorbed, what identifies the coefficient is the non-additive part of the
-region-by-category matrix, which does not vanish. On the observed regional
-composition it can exceed the spread of the region-only measure, and it would
-also absorb the seasonal confound that defeats the category design. See
-`docs/decision_log.md`.
+An earlier version of this README argued that building these would not help,
+because both new terms are national. That was wrong: with region-time and
+category-time effects absorbed, what identifies the coefficient is the
+non-additive part of the region-by-category matrix, which does not vanish.
+
+Both terms now exist. `ptmw build consumption-bridge` composes the bridge from
+Eurostat's use table, read at basic prices and domestic uses, and the
+concordance recorded in `config/consumption_bridge.yaml`; `ptmw build
+structural-exposure` and `ptmw analyse structural-design` build and estimate the
+design. Its value is less a wider regressor than the fixed effects it can carry:
+region-time effects absorb the tourism and island supply shocks the regional
+comparison is otherwise exposed to, and category-time effects absorb the January
+sales cycle that defeats the category design.
+
+It is the only design here that rejects anything — two of seven horizons at five
+per cent, none surviving Holm — and its magnitudes disqualify it. The
+coefficient is on an exposure index rather than a cost share and is not
+interpretable directly; scaled into points, the estimates imply differential
+price responses larger than complete pass-through of the entire minimum-wage
+cost bill could produce. Absorbing the confounds did not make the effect
+identifiable, which is what establishes that the confounds were never the
+constraint: policy is assigned to nine regions, and finer structure adds cells
+rather than clusters. See `docs/decision_log.md`.
 
 Diagnostics that are implemented: a joint pre-trend test over the leads,
-wild-cluster and randomization inference for the small number of regions, Holm
-correction across horizons, sixteen alternative constructions of the exposure
-measure, minimum detectable effects, and a seasonal-confound diagnostic.
+wild-cluster and randomization inference for the small number of regions,
+confidence intervals obtained by inverting the bootstrap test, Holm correction
+across horizons, sixteen alternative constructions of the exposure measure,
+minimum detectable effects, and a seasonal-confound diagnostic.
 
 ## Public data sources
 
@@ -102,7 +122,7 @@ The repository uses public or openly downloadable sources wherever possible:
 - Regional official gazettes: Madeira and Azores regional minimum-wage schedules.
 - GEP / MTSSS: minimum-wage coverage (`RMMG`) by economic activity and NUTS II region.
 - INE: national and NUTS II CPI by consumption purpose; national accounts and regional controls.
-- Eurostat: detailed monthly HICP/ECOICOP indices, HICP weights, constant-tax HICP, labour productivity and national-accounts controls.
+- Eurostat: detailed monthly HICP/ECOICOP indices, HICP weights, constant-tax HICP, labour productivity and national-accounts controls; regional accounts employment by NUTS II region and activity (`nama_10r_3empers`); compensation of employees and value added by activity (`nama_10_a64`); and the use table at basic prices (`naio_10_cp1610`), read at domestic uses for household final consumption by product.
 - AMECO / European Commission: long-run macroeconomic series where a consistent pre-Eurostat history is required.
 
 Every downloaded file is retained under `data/raw/` with metadata and a checksum. Processed datasets are generated from raw inputs and never edited by hand.

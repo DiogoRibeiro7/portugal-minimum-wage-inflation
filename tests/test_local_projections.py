@@ -81,6 +81,48 @@ def test_both_p_values_are_reported() -> None:
     assert (estimates["p_value_bootstrap"] <= 1).all()
 
 
+def test_the_interval_is_reported_beside_the_p_value_and_agrees_with_it() -> None:
+    """Every horizon carries an interval, and it tells the same story as the test.
+
+    The estimator runs the test and the inversion from one seed for this reason:
+    if they drew different sign vectors the interval could exclude a value the
+    reported p-value does not reject, which is the defect that sank the band
+    built by resampling around the estimate.
+    """
+    estimates = estimate_panel_local_projections(
+        make_panel(PanelSpec(response={1: 0.0, 6: 0.0}, seed=105)),
+        outcome="log_price",
+        shock="exposure_shock",
+        horizons=[1, 6],
+        bootstrap_draws=99,
+    )
+
+    assert {"interval_lower", "interval_upper", "interval_bounded"}.issubset(estimates.columns)
+    for _, row in estimates.iterrows():
+        assert row["interval_lower"] <= row["coefficient"] <= row["interval_upper"]
+        covers_zero = row["interval_lower"] <= 0.0 <= row["interval_upper"]
+        assert covers_zero == (row["p_value_bootstrap"] > 0.05)
+
+
+def test_intervals_can_be_declined_without_leaving_an_empty_column() -> None:
+    """A caller reducing runs to rejection counts should not pay for intervals.
+
+    Absent columns rather than NaN ones, so a reader can tell a caller that did
+    not ask from a search that ran and failed.
+    """
+    estimates = estimate_panel_local_projections(
+        make_panel(PanelSpec(response={1: 0.0}, seed=106)),
+        outcome="log_price",
+        shock="exposure_shock",
+        horizons=[1],
+        bootstrap_draws=99,
+        intervals=False,
+    )
+
+    assert not {"interval_lower", "interval_upper", "interval_bounded"} & set(estimates.columns)
+    assert "p_value_bootstrap" in estimates.columns
+
+
 def test_no_effect_is_not_detected() -> None:
     """A panel with no pass-through must not produce significant estimates."""
     estimates = estimate_panel_local_projections(

@@ -25,6 +25,7 @@ from pt_mw_inflation.analysis.outputs import (
     write_regional_premium_macros,
     write_robustness_table,
     write_seasonality_macros,
+    write_structural_design_macros,
 )
 from pt_mw_inflation.data.ameco import fetch_series as fetch_ameco_series
 from pt_mw_inflation.data.ameco import to_frame as ameco_to_frame
@@ -40,8 +41,16 @@ from pt_mw_inflation.data.eurostat_regional import (
 )
 from pt_mw_inflation.data.freeze import FreezeError, verify_manifest, write_manifest
 from pt_mw_inflation.data.ine import fetch_regional_cpi
+from pt_mw_inflation.data.labour_shares import fetch_labour_shares
+from pt_mw_inflation.data.labour_shares import to_frame as labour_shares_to_frame
 from pt_mw_inflation.data.registry import download_registry
+from pt_mw_inflation.data.supply_use import fetch_household_consumption
+from pt_mw_inflation.data.supply_use import to_frame as consumption_to_frame
 from pt_mw_inflation.data.worldbank import fetch_indicator
+from pt_mw_inflation.processing.consumption_bridge import (
+    ConsumptionBridgeError,
+    build_consumption_bridge,
+)
 from pt_mw_inflation.processing.exposure import (
     ExposureError,
     PredeterminationError,
@@ -51,6 +60,7 @@ from pt_mw_inflation.processing.exposure import (
     measure_variation_strength,
     select_snapshot,
     shift_share_exposure,
+    structural_exposure,
 )
 from pt_mw_inflation.processing.macro import (
     build_macro_annual,
@@ -66,6 +76,7 @@ from pt_mw_inflation.processing.minimum_wage import (
 from pt_mw_inflation.processing.pass_through import (
     PassThroughError,
     add_exposure_interaction,
+    add_structural_interaction,
     build_estimation_panel,
     build_regional_shock,
     count_identifying_events,
@@ -167,6 +178,184 @@ def data_regional_employment(
     typer.echo(
         f"  counted over {national['population'].iat[0]}, the population the bite is measured on"
     )
+
+
+@build_app.command("consumption-bridge")
+def build_consumption_bridge_command(
+    year: int = typer.Option(2015, help="Reference year of the use table."),
+    margin_rule: str = typer.Option(
+        "goods",
+        help="Trade-margin allocation: 'goods' in proportion to goods content, "
+        "'uniform' evenly across categories, 'own' unallocated.",
+    ),
+    consumption_output: Path = typer.Option(
+        Path("data/processed/household_consumption.parquet"),
+        help="Household consumption by CPA product, at basic prices, domestic uses.",
+    ),
+    labour_output: Path = typer.Option(
+        Path("data/processed/labour_shares.parquet"),
+        help="Labour-cost share by activity, the other national term.",
+    ),
+    output: Path = typer.Option(
+        Path("data/processed/consumption_bridge.parquet"), help="Output Parquet path."
+    ),
+) -> None:
+    """Build the production-to-consumption bridge from the use table and the concordance.
+
+    Three of the four terms the region-by-category exposure needs are published.
+    This builds the fourth, which is not: no source crosses a consumption purpose
+    with a producing industry for Portugal, so the bridge combines a measured
+    consumption vector with the concordance recorded in
+    `config/consumption_bridge.yaml`.
+
+    The measurement is taken at basic prices and domestic uses only. Both are
+    arguments rather than defaults, and the module docstring says why: at
+    purchasers' prices the retail margin on a good is credited to the industry
+    that made it, and including imports credits Portuguese employment with costs
+    incurred abroad.
+    """
+    root = _repo_root()
+    registry = yaml.safe_load((root / "config/consumption_bridge.yaml").read_text(encoding="utf-8"))
+
+    consumption = fetch_household_consumption(year=year)
+    consumption_frame = consumption_to_frame(consumption)
+    labour = fetch_labour_shares(year=year)
+
+    try:
+        bridge, coverage = build_consumption_bridge(
+            registry, consumption_frame, margin_rule=margin_rule
+        )
+    except ConsumptionBridgeError as error:
+        raise typer.BadParameter(str(error)) from error
+
+    for frame, path in (
+        (consumption_frame, consumption_output),
+        (labour_shares_to_frame(labour), labour_output),
+        (bridge, output),
+    ):
+        destination = root / path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        frame.to_parquet(destination, index=False)
+
+    typer.echo(
+        f"Wrote {bridge['category'].nunique()} categories x "
+        f"{bridge['industry'].nunique()} industries to {output}"
+    )
+    typer.echo(
+        f"  consumption from the {year} use table at basic prices, domestic uses: "
+        f"{consumption.product_total:,.0f} of {consumption.purchasers_total:,.0f} MEUR"
+    )
+    typer.echo(
+        f"  {100 * consumption.excluded_share:.1f}% of household spending has no producing "
+        f"industry behind it ({100 * consumption.imported_share:.1f}% imported content, "
+        f"{100 * consumption.tax_share:.1f}% product taxes). No concordance can reach it."
+    )
+    typer.echo(f"  concordance places {100 * coverage.matched_share:.1f}% of domestic consumption")
+    if coverage.unmatched_products:
+        typer.echo(
+            f"  {len(coverage.unmatched_products)} product(s) unplaced: "
+            f"{', '.join(coverage.unmatched_products[:5])}"
+        )
+    typer.echo(f"  labour shares validated against an economy-wide {labour.aggregate:.3f}")
+    if labour.suppressed:
+        typer.echo(
+            f"  suppressed as an accounting artefact: {', '.join(labour.suppressed)}. "
+            "Real estate value added is imputed rent, which employs nobody."
+        )
+
+
+@build_app.command("structural-exposure")
+def build_structural_exposure(
+    regional: Path = typer.Option(
+        Path("data/processed/regional_employment.parquet"),
+        help="Regional employment from 'ptmw data regional-employment'.",
+    ),
+    national: Path = typer.Option(
+        Path("data/processed/national_employment.parquet"),
+        help="National employment by NACE section.",
+    ),
+    bridge: Path = typer.Option(
+        Path("data/processed/consumption_bridge.parquet"),
+        help="Production-to-consumption bridge from 'ptmw build consumption-bridge'.",
+    ),
+    labour: Path = typer.Option(
+        Path("data/processed/labour_shares.parquet"), help="Labour-cost share by activity."
+    ),
+    baseline_year: int = typer.Option(2015, help="Year the composition is frozen at."),
+    bite_period: str = typer.Option("2015-10", help="Survey round the bite comes from."),
+    first_shock_year: int = typer.Option(
+        0, help="First year of the episode. When set, predetermination is enforced."
+    ),
+    output: Path = typer.Option(
+        Path("data/processed/structural_exposure.parquet"), help="Output Parquet path."
+    ),
+) -> None:
+    """Build the region-by-category exposure from all four of its terms.
+
+    Composition varies by region and the other three terms are national. That is
+    not an objection to the measure: once region-time and category-time effects
+    are absorbed, what identifies the coefficient is the non-additive part of the
+    region-by-category matrix, and national factors enter it through their
+    product with composition.
+
+    The number to judge it by is the identifying spread reported below, which is
+    the range left after those effects remove the matrix's row and column means.
+    The raw spread is larger and does not describe what the design has.
+    """
+    root = _repo_root()
+    for path in (regional, national, bridge, labour):
+        if not (root / path).exists():
+            raise typer.BadParameter(f"{path} not found; build it first")
+
+    registry = yaml.safe_load((root / "config/minimum_wage_bite.yaml").read_text(encoding="utf-8"))
+    try:
+        registry = select_snapshot(registry, bite_period or None)
+    except ExposureError as error:
+        raise typer.BadParameter(str(error)) from error
+
+    if first_shock_year:
+        try:
+            check_predetermined(registry, baseline_year, first_shock_year)
+        except PredeterminationError as error:
+            raise typer.BadParameter(str(error)) from error
+
+    shares = industry_shares(pd.read_parquet(root / regional), year=baseline_year)
+    bite = activity_bite_from_registry(registry, pd.read_parquet(root / national))
+
+    try:
+        exposure, coverage = structural_exposure(
+            shares,
+            bite,
+            pd.read_parquet(root / labour),
+            pd.read_parquet(root / bridge),
+        )
+    except ExposureError as error:
+        raise typer.BadParameter(str(error)) from error
+
+    destination = root / output
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    exposure.to_parquet(destination, index=False)
+
+    typer.echo(
+        f"Wrote {len(exposure)} region-category cells "
+        f"({exposure['region'].nunique()} x {exposure['category'].nunique()}) to {output}"
+    )
+    typer.echo(
+        f"  identifying spread {coverage.identifying_spread:.2f}pp after region-time and "
+        "category-time effects. Judge the design by this, not by the raw range."
+    )
+    typer.echo(f"  bite from the {registry['source']['reference_period']} survey round")
+    typer.echo(
+        f"  {100 * coverage.measured_share:.1f}% of the bridge's weight reaches an activity "
+        "carrying both a bite and a labour share"
+    )
+    for activity, missing in coverage.unmeasured_activities:
+        typer.echo(f"    {activity}: no {missing}; contributes nothing rather than being imputed")
+    if not coverage.coverage_weighted:
+        typer.echo(
+            "  WARNING: the bite carried no measured_employment_share, so every group was "
+            "treated as fully surveyed. The spread above is overstated."
+        )
 
 
 @build_app.command("regional-exposure")
@@ -308,6 +497,31 @@ def _load_settings(root: Path) -> dict[str, Any]:
     """Read the analysis configuration."""
     loaded = yaml.safe_load((root / "config/analysis.yaml").read_text(encoding="utf-8"))
     return dict(loaded or {})
+
+
+def _echo_intervals(estimates: pd.DataFrame) -> None:
+    """Report the inverted interval, which is what a null p-value cannot say.
+
+    Reported at the widest horizon rather than the narrowest. The narrowest
+    flatters the design, and the question a reader has after a table of nulls is
+    what the design failed to rule out, which is what the widest one answers.
+    """
+    if "interval_lower" not in estimates.columns:
+        return
+
+    ordered = estimates.reset_index(drop=True)
+    widths = (ordered["interval_upper"] - ordered["interval_lower"]).to_numpy(dtype=float)
+    widest = int(widths.argmax())
+    horizon = int(ordered["horizon"].to_numpy()[widest])
+    lower = float(ordered["interval_lower"].to_numpy()[widest])
+    upper = float(ordered["interval_upper"].to_numpy()[widest])
+    typer.echo(f"  95% inverted interval at horizon {horizon} (widest): [{lower:.3f}, {upper:.3f}]")
+    if not bool(estimates["interval_bounded"].all()):
+        unbounded = int((~estimates["interval_bounded"]).sum())
+        typer.echo(
+            f"  {unbounded} interval(s) ran past the widest range searched. "
+            "Their endpoints are where the search stopped, not where the interval does."
+        )
 
 
 @build_app.command("macro")
@@ -518,6 +732,7 @@ def analyse_pass_through(
         f"  significant at 5%: {conventional} horizon(s) by clustered inference, "
         f"{bootstrap} by the bootstrap"
     )
+    _echo_intervals(estimates)
     if conventional > bootstrap:
         typer.echo(
             "  Cite the bootstrap. With this few clusters the clustered p-value "
@@ -624,6 +839,149 @@ def analyse_exposure_design(
         f"inference, {int((estimates['p_value_bootstrap'] < 0.05).sum())} by the bootstrap, "
         f"{survivors} after Holm"
     )
+    _echo_intervals(estimates)
+
+
+@analyse_app.command("structural-design")
+def analyse_structural_design(
+    prices: Path = typer.Option(
+        Path("data/processed/regional_price_panel.parquet"), help="Regional price panel."
+    ),
+    wages: Path = typer.Option(
+        Path("data/processed/minimum_wage_policy.parquet"), help="Statutory panel."
+    ),
+    exposure: Path = typer.Option(
+        Path("data/processed/structural_exposure.parquet"),
+        help="Region-by-category exposure from 'ptmw build structural-exposure'.",
+    ),
+    start: str = typer.Option("2016-01", help="First month; must follow the bite's survey round."),
+) -> None:
+    """Estimate the region-by-category design and write its table.
+
+    This is the design the decision log gated on the consumption bridge being
+    concentrated enough to build. Its advantage over the shift-share design is
+    not a wider regressor but the fixed effects it can carry: because exposure
+    varies across regions *and* categories, the interaction survives region-time
+    effects, which absorb the tourism, transport and island-supply shocks that
+    make the autonomous regions a poor control, and category-time effects, which
+    absorb the January sales cycle that defeated the category design.
+
+    It does not relax the constraint the rest of the paper documents. Policy is
+    assigned by region, so inference still clusters on nine regions however many
+    region-category cells the panel holds.
+    """
+    root = _repo_root()
+    for path in (prices, wages, exposure):
+        if not (root / path).exists():
+            raise typer.BadParameter(f"{path} not found; build it first")
+
+    settings = _load_settings(root)
+    horizons = list(settings["pass_through"]["horizons_months"])
+
+    acts = yaml.safe_load((root / "config/legal_acts.yaml").read_text(encoding="utf-8"))
+    gaps = {
+        block["geography"]: frozenset(block.get("gap_years", []) or [])
+        for block in acts["regional"].values()
+    }
+
+    panel = build_estimation_panel(
+        pd.read_parquet(root / prices),
+        pd.read_parquet(root / wages).query("scope == 'general'"),
+        start=start,
+        gap_years=gaps,
+    )
+    exposure_frame = pd.read_parquet(root / exposure)
+    try:
+        panel = add_structural_interaction(panel, exposure_frame)
+    except PassThroughError as error:
+        raise typer.BadParameter(str(error)) from error
+
+    # What the design has after its own fixed effects, recomputed here rather
+    # than carried from the build step so the reported figure describes the
+    # exposure file this run actually read.
+    matrix = exposure_frame.pivot(
+        index="region", columns="category", values="structural_exposure"
+    ).to_numpy(dtype=float)
+    residual = (
+        matrix
+        - matrix.mean(axis=1, keepdims=True)
+        - matrix.mean(axis=0, keepdims=True)
+        + matrix.mean()
+    )
+    identifying_spread = 100.0 * float(residual.max() - residual.min())
+
+    # What complete pass-through could produce. The exposure is not a cost share
+    # --- it weights industries by regional employment and runs about a third of
+    # one --- so the coefficient cannot be read as a multiple of pass-through.
+    # The largest category cost share can be, and it bounds the differential
+    # response that passing every euro of minimum-wage cost into prices would
+    # give. An estimate above it is impossible rather than merely large.
+    cost_share_ceiling = float(exposure_frame["category_cost_share"].max())
+
+    absorb = ["region_category", "region_month", "category_month"]
+    typer.echo(
+        f"Estimating on {len(panel):,} rows, {panel['region_category'].nunique()} cells, "
+        f"{panel['month'].nunique()} months, absorbing {', '.join(absorb)}"
+    )
+    typer.echo("  The three-way design is large; each horizon takes about a minute.")
+
+    estimates = estimate_panel_local_projections(
+        panel,
+        outcome="log_price",
+        shock="structural_shock",
+        horizons=horizons,
+        cluster="region",
+        absorb=absorb,
+    )
+    if estimates.empty:
+        raise typer.BadParameter("no horizon could be estimated")
+
+    destination = root / "report/tables/structural_design.tex"
+    write_regional_design_table(estimates, destination, command="ptmw analyse structural-design")
+    write_structural_design_macros(
+        estimates,
+        root / "report/tables/structural_design_macros.tex",
+        identifying_spread=identifying_spread,
+        cost_share_ceiling=cost_share_ceiling,
+    )
+
+    # The falsification battery applies here too, for the reason it applies to
+    # the exposure design: reporting it for two designs and not the third would
+    # let the untested one borrow the others' credibility.
+    pre_trend = assess_pre_trends(
+        panel, outcome="log_price", shock="structural_shock", absorb=absorb
+    )
+    write_pre_trend_macros(
+        pre_trend,
+        root / "report/tables/structural_pre_trend_macros.tex",
+        prefix="Structural",
+        command="ptmw analyse structural-design",
+    )
+
+    typer.echo(f"Wrote {len(estimates)} horizon estimates to {destination.relative_to(root)}")
+    typer.echo(
+        f"  joint pre-trend test on {pre_trend.restrictions} leads: p = {pre_trend.p_value:.3f}"
+    )
+    typer.echo(
+        f"  significant at 5%: {int((estimates['p_value_clustered'] < 0.05).sum())} by clustered "
+        f"inference, {int((estimates['p_value_bootstrap'] < 0.05).sum())} by the bootstrap, "
+        f"{int((estimates['p_value_bootstrap_holm'] < 0.05).sum())} after Holm"
+    )
+
+    # The coefficient is not readable on its own, so it is reported scaled into
+    # points against the ceiling complete pass-through could reach.
+    implied = estimates["coefficient"].abs() * (identifying_spread / 100.0) * 0.10 * 100.0
+    ceiling = 100.0 * cost_share_ceiling * 0.10
+    typer.echo(
+        f"  identifying spread {identifying_spread:.2f}pp; for a 10% statutory rise the "
+        f"estimates imply differential responses up to {implied.max():.1f}pp"
+    )
+    typer.echo(
+        f"  complete pass-through of the largest category cost share "
+        f"({100 * cost_share_ceiling:.0f}%) could reach {ceiling:.1f}pp. "
+        f"{int((implied > ceiling).sum())} horizon(s) exceed it, which is impossible, not large."
+    )
+    _echo_intervals(estimates)
 
 
 @analyse_app.command("exposure-robustness")
@@ -684,6 +1042,9 @@ def analyse_exposure_robustness(
             shock="exposure_shock",
             horizons=horizons,
             cluster="region",
+            # Every run here is reduced to a coefficient range and two rejection
+            # counts, so inverting the test per horizon would be discarded work.
+            intervals=False,
         )
 
     runs = []

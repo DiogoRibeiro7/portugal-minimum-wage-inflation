@@ -202,6 +202,7 @@ def test_every_writer_defines_something() -> None:
         "write_exposure_design_macros",
         "write_regional_premium_macros",
         "write_seasonality_macros",
+        "write_structural_design_macros",
     }
     assert writers == exercised, (
         "tests/macro_names.py does not exercise every macro writer; "
@@ -271,6 +272,9 @@ _ARTEFACT_PRODUCER = {
     "tables/exposure_robustness": "ptmw analyse exposure-robustness",
     "tables/pre_trend_macros": "ptmw analyse pass-through",
     "tables/exposure_pre_trend_macros": "ptmw analyse exposure-design",
+    "tables/structural_design": "ptmw analyse structural-design",
+    "tables/structural_design_macros": "ptmw analyse structural-design",
+    "tables/structural_pre_trend_macros": "ptmw analyse structural-design",
 }
 
 _INPUT = re.compile(r"\\input\{(tables/[a-z_]+)\}")

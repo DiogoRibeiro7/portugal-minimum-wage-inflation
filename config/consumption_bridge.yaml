@@ -1,0 +1,286 @@
+# Which industries supply each consumption category.
+#
+# This is the second of the two terms the region-by-category exposure needs:
+#
+#     B[r, c] = sum_s q[r, s] * bite[s] * labour_cost_share[s] * bridge[c, s]
+#
+# `q` comes from Eurostat's regional accounts, `bite` from the GEP monitoring
+# reports registered in `minimum_wage_bite.yaml`, and `labour_cost_share` from
+# `pt_mw_inflation.data.labour_shares`. The bridge is the remaining term and it
+# is the only one that cannot be read off a published table, because no source
+# crosses a consumption purpose with a producing industry for Portugal.
+#
+# It is therefore judgement, and this project's convention is that judgement is
+# written down rather than buried in a lookup table. What follows records the
+# concordance and, more importantly, the three decisions that determine the
+# answer. Each is contestable and each is stated so it can be contested.
+#
+#
+# DECISION 1: basic prices, not purchasers' prices.
+#
+# The weights below are applied to household final consumption expenditure by
+# CPA product taken from Eurostat's use table at *basic* prices
+# (`naio_10_cp1610`, `ind_use=P3_S14`, `stk_flow=DOM`), not the purchasers'
+# price table. The difference is not presentational and it decides the result.
+#
+# At purchasers' prices the retail margin on a loaf of bread is recorded inside
+# "food products", so the whole retail price is attributed to manufacturing. At
+# basic prices the margin appears where it is earned, as consumption of retail
+# trade services. Portuguese household consumption looks entirely different
+# under the two conventions: food, beverages and tobacco fall from 17.0 per cent
+# of the basket to 7.9, while wholesale and retail trade rise from almost
+# nothing to 18.6. Since retail is a minimum-wage-intensive activity and
+# manufacturing much less so, using purchasers' prices would put the wage
+# exposure of the shopping basket in the wrong industry entirely.
+#
+#
+# DECISION 2: domestic content only.
+#
+# `stk_flow=DOM` excludes the imported part of each product. A rise in the
+# Portuguese minimum wage does not raise the cost of the imported content of a
+# television, and counting it would inflate the exposure of every goods-heavy
+# category. This matters most where it is least visible: textiles and apparel
+# are 7.4 per cent of the basket at purchasers' prices and 2.0 per cent of
+# domestic content at basic prices, because most of what Portugal wears is
+# imported and most of what its textile industry makes is exported.
+#
+# The consequence is that the design cannot speak to imported goods at all.
+# That is a real limitation and not a modelling convenience: for a tradable good
+# sold at national chain prices, regional production composition is not what
+# sets the regional price anyway.
+#
+#
+# DECISION 3: trade margins follow the goods they are earned on.
+#
+# Wholesale and retail trade (CPA_G46, CPA_G47) are 18.6 per cent of domestic
+# household consumption at basic prices, and they are not a consumption category
+# of their own: nobody buys "retail trade services". The margin is earned on the
+# goods it distributes, so it is allocated across categories in proportion to
+# each category's *goods* content, which `margin_allocation` below defines.
+#
+# This is the single most consequential choice in the file, and it works against
+# the design. It puts a large, common block of the same industry into every
+# goods-carrying category, which is exactly the additive structure that
+# region-time and category-time fixed effects absorb. An alternative that
+# assigned all trade to a single "shopping" category would make the bridge look
+# far more concentrated and would be indefensible.
+#
+# Motor trade (CPA_G45) is the exception and is assigned directly to transport,
+# since vehicle sales and repair are not a margin on other categories' goods.
+
+source:
+  use_table: naio_10_cp1610
+  description: >-
+    Eurostat use table at basic prices, household final consumption
+    expenditure (P3_S14), domestic uses only (DOM), Portugal.
+  reference_year: 2015
+  price_basis: basic
+  origin: domestic
+
+# Products whose value is a margin on other categories' goods rather than a
+# purchase in its own right. Distributed across categories in proportion to
+# each category's goods content, where "goods" means the CPA groups named in
+# `goods_products`.
+margin_allocation:
+  margin_products: [CPA_G46, CPA_G47]
+  goods_prefixes: [CPA_A, CPA_B, CPA_C, CPA_D, CPA_E]
+
+# Each category lists the CPA products it consumes and the share of each
+# product's domestic consumption that belongs to it. A product appearing under
+# one category alone carries a share of 1.0 and is omitted for brevity; splits
+# are stated explicitly with their reasoning.
+#
+# Codes are the thirteen COICOP divisions of Statistics Portugal indicator
+# 0014659, which is the ECOICOP 2018 revision: division 08 is information and
+# communication rather than the older communication, and 12 is financial and
+# insurance services.
+categories:
+  "01":
+    name: Food and non-alcoholic beverages
+    products:
+      CPA_A01: 1.0
+      CPA_A03: 1.0
+      CPA_C10-12: 0.82
+    notes: >-
+      Agriculture and fishing enter here directly, but most of the category's
+      domestic content is food manufacturing and the trade margin on it. The
+      split of CPA_C10-12 between this division and alcohol and tobacco follows
+      their relative weight in Portuguese household expenditure, roughly five
+      to one.
+
+  "02":
+    name: Alcoholic beverages, tobacco and narcotics
+    products:
+      CPA_C10-12: 0.18
+    notes: >-
+      The complement of the food split. Tobacco carries a large excise
+      component, which is not domestic industry content and is already excluded
+      by using basic prices.
+
+  "03":
+    name: Clothing and footwear
+    products:
+      CPA_C13-15: 1.0
+    notes: >-
+      Two per cent of domestic content, against seven at purchasers' prices
+      including imports. Portugal's textile and footwear industry is
+      export-oriented, so the domestic content of what Portuguese households
+      wear is much smaller than the industry's employment share suggests.
+
+  "04":
+    name: Housing, water, electricity, gas and other fuels
+    products:
+      CPA_L68A: 1.0
+      CPA_L68B: 1.0
+      CPA_D: 1.0
+      CPA_E36: 1.0
+      CPA_E37-39: 1.0
+      CPA_F: 1.0
+      CPA_C19: 0.2
+      CPA_A02: 1.0
+      CPA_B: 1.0
+    notes: >-
+      The largest category by domestic content, and the one most affected by an
+      accounting artefact. Imputed rents of owner-occupied dwellings are 14.3
+      per cent of the whole basket and are attributed to real estate, an
+      activity whose measured labour share is near zero precisely because
+      imputed rents employ nobody. The category therefore carries a great deal
+      of consumption weight and almost no wage exposure. That is arithmetically
+      right and it should be stated rather than smoothed over.
+      CPA_C19 is split with transport: a fifth of refined petroleum is taken as
+      heating fuel and the rest as motor fuel. Forestry and mining products are
+      here as fuel wood and solid fuels; together they are under a tenth of a
+      per cent of domestic content and are listed only so that the concordance
+      places every product rather than leaving a silent remainder.
+
+  "05":
+    name: Furnishings, household equipment and routine maintenance
+    products:
+      CPA_C31_32: 1.0
+      CPA_C17: 1.0
+      CPA_C22: 1.0
+      CPA_C23: 1.0
+      CPA_C25: 1.0
+      CPA_C27: 1.0
+      CPA_C28: 1.0
+      CPA_C16: 1.0
+      CPA_C24: 1.0
+      CPA_C33: 1.0
+      CPA_N80-82: 1.0
+      CPA_C20: 0.5
+      CPA_S95: 0.5
+    notes: >-
+      Furniture, appliances and the services that maintain a household.
+      Chemicals are split evenly with personal care, and repair services evenly
+      with information and communication, neither split being better than a
+      guess at this level of aggregation. Both products are small enough that
+      the split cannot move the result.
+
+  "06":
+    name: Health
+    products:
+      CPA_Q86: 1.0
+      CPA_C21: 1.0
+    notes: >-
+      Human health services and pharmaceuticals. This is out-of-pocket
+      household expenditure only; the publicly provided part is government
+      consumption and is not in this column.
+
+  "07":
+    name: Transport
+    products:
+      CPA_G45: 1.0
+      CPA_H49: 1.0
+      CPA_H50: 1.0
+      CPA_H51: 1.0
+      CPA_H52: 1.0
+      CPA_H53: 1.0
+      CPA_C29: 1.0
+      CPA_C30: 1.0
+      CPA_C19: 0.8
+      CPA_N77: 0.6
+    notes: >-
+      Vehicle purchase and repair, fuel, and transport services. Motor trade is
+      assigned here in full rather than treated as a margin on other
+      categories, because selling and repairing vehicles is the transaction
+      rather than a markup on somebody else's goods.
+
+  "08":
+    name: Information and communication
+    products:
+      CPA_J61: 1.0
+      CPA_J58: 1.0
+      CPA_J62_63: 1.0
+      CPA_C26: 1.0
+      CPA_S95: 0.5
+    notes: >-
+      Telecommunications dominate. Publishing sits here rather than in
+      recreation because the ECOICOP 2018 revision moved books and newspapers
+      into information and communication.
+
+  "09":
+    name: Recreation, sport and culture
+    products:
+      CPA_R90-92: 1.0
+      CPA_R93: 1.0
+      CPA_J59_60: 1.0
+      CPA_N79: 1.0
+      CPA_N77: 0.4
+    notes: >-
+      Cultural and sporting services, broadcasting, and package holidays
+      through travel agencies. Accommodation bought as part of a package is
+      recorded against the agency rather than the hotel, which understates this
+      category's overlap with restaurants and accommodation.
+
+  "10":
+    name: Education services
+    products:
+      CPA_P: 1.0
+    notes: >-
+      Household expenditure on education, which is the private and
+      co-payment part. Education sits inside the O-Q employment group with
+      public administration and health, so its regional variation is not
+      separable from theirs in the regional accounts.
+
+  "11":
+    name: Restaurants and accommodation services
+    products:
+      CPA_I: 1.0
+    notes: >-
+      The cleanest category in the file: one CPA product, one NACE section, no
+      splits and no margin. It is also the category with the highest
+      minimum-wage bite of any activity in the Portuguese economy, which is why
+      the design would be expected to find its effect here if anywhere.
+
+  "12":
+    name: Financial and insurance services
+    products:
+      CPA_K64: 1.0
+      CPA_K65: 1.0
+      CPA_K66: 1.0
+    notes: >-
+      Financial services measured largely as indirectly measured intermediation
+      charges, an imputation rather than a posted price. The consumer price
+      index for this division is correspondingly weakly defined.
+
+  "13":
+    name: Personal care, social protection and miscellaneous goods and services
+    products:
+      CPA_S96: 1.0
+      CPA_S94: 1.0
+      CPA_T: 1.0
+      CPA_Q87_88: 1.0
+      CPA_M69_70: 1.0
+      CPA_M71: 1.0
+      CPA_M72: 1.0
+      CPA_M73: 1.0
+      CPA_M74_75: 1.0
+      CPA_O: 1.0
+      CPA_C18: 1.0
+      CPA_N78: 1.0
+      CPA_C20: 0.5
+    notes: >-
+      Hairdressing and personal care, social work, and the professional
+      services households buy directly. Domestic service (CPA_T) is here, and
+      it is the one activity in the file whose employer is the household
+      itself.

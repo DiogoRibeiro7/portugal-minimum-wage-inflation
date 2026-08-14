@@ -535,3 +535,90 @@ def add_exposure_interaction(
     centred = merged[exposure_column] - merged[exposure_column].mean()
     merged["exposure_shock"] = centred * merged[shock_column]
     return merged
+
+
+def add_structural_interaction(
+    panel: pd.DataFrame,
+    exposure: pd.DataFrame,
+    *,
+    shock_column: str = "delta_log_national_minimum_wage",
+    exposure_column: str = "structural_exposure",
+    region_column: str = "region",
+    category_column: str = "category_code",
+) -> pd.DataFrame:
+    r"""Interact the national statutory change with region-by-category exposure.
+
+    The regressor is :math:`B_{rc}\,\Delta\log MW^{PT}_t`, with the *national*
+    change for the same reason the shift-share design uses it: multiplying by
+    the applicable regional change would smuggle Madeira's own statutory
+    variation into a measure meant to carry composition alone.
+
+    What this design has that the region-only one does not is the fixed effects
+    it can carry. Because :math:`B_{rc}` varies across both regions and
+    categories, the interaction survives region-time *and* category-time
+    effects. The first absorb anything moving one region's prices in a month,
+    which is the tourism, transport and island-supply confound that makes the
+    autonomous regions a poor control; the second absorb each category's
+    national seasonal movement, which is the January sales cycle that defeated
+    the category-differential design. Neither is available to a shock that
+    varies on one dimension only.
+
+    What survives all of that is the double-demeaned part of :math:`B`, since
+    the common national change means region-time effects remove its row means
+    and category-time effects its column means. That residual is much smaller
+    than the raw spread, and it is what
+    :func:`~pt_mw_inflation.processing.exposure.structural_exposure` reports.
+
+    Args:
+        panel: Output of :func:`build_estimation_panel`.
+        exposure: Region-by-category exposure.
+        shock_column: Column holding the national log statutory change.
+        exposure_column: Column holding the exposure.
+        region_column: Column identifying the region in the panel.
+        category_column: Column identifying the consumption category.
+
+    Returns:
+        The panel with `structural_shock`, and the region-time and
+        category-time identifiers the design absorbs.
+
+    Raises:
+        PassThroughError: If a column is missing, or nothing merges, which is
+            what a region or category coding mismatch looks like.
+    """
+    for name, frame, columns in (
+        ("panel", panel, {shock_column, region_column, category_column, "month"}),
+        ("exposure", exposure, {exposure_column, "region", "category"}),
+    ):
+        missing = columns.difference(frame.columns)
+        if missing:
+            raise PassThroughError(f"{name} missing columns: {sorted(missing)}")
+
+    merged = panel.merge(
+        exposure[["region", "category", exposure_column]],
+        left_on=[region_column, category_column],
+        right_on=["region", "category"],
+        how="inner",
+        suffixes=("", "_exposure"),
+    )
+    if merged.empty:
+        raise PassThroughError(
+            "no region-category cell matches between the panel and the exposure; "
+            f"panel has {sorted(panel[category_column].unique())[:4]}..., "
+            f"exposure has {sorted(exposure['category'].unique())[:4]}..."
+        )
+
+    # Demeaned for the same reason as the shift-share shock: the coefficient
+    # should be the differential response of a cell one unit more exposed than
+    # average, not a level whose reading depends on where the scale sits.
+    centred = merged[exposure_column] - merged[exposure_column].mean()
+    merged["structural_shock"] = centred * merged[shock_column]
+
+    # The two absorbed dimensions, built here so the estimator is not left to
+    # infer them from column names. A region-month present for one category and
+    # absent for another is a real feature of the panel, and building the keys
+    # from the data rather than from a product keeps it that way.
+    merged["region_month"] = merged[region_column].astype(str) + "_" + merged["month"].astype(str)
+    merged["category_month"] = (
+        merged[category_column].astype(str) + "_" + merged["month"].astype(str)
+    )
+    return merged

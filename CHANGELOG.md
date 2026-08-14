@@ -98,9 +98,82 @@ was.
   price indices by NUTS II region and consumption purpose, monthly, built for
   2000 onwards by `ptmw data ine-cpi`. This is the last data dependency of the
   pass-through design, and no other source publishes it.
+- The region-by-category design, built and estimated. `ptmw build
+  structural-exposure` composes `B[r,c] = sum_s q[r,s] b[s] l[s] w[c,s]` and
+  `ptmw analyse structural-design` estimates its interaction with the national
+  statutory change, absorbing region-category, region-time and category-time
+  effects together. It is the only design in the paper that rejects anything ---
+  two of seven horizons at five per cent, none surviving Holm --- and it is
+  disqualified by its own magnitudes. The coefficient is on an exposure index
+  rather than a cost share and is not interpretable directly; scaled into
+  points, three horizons imply differential price responses larger than complete
+  pass-through of the entire minimum-wage cost bill could produce. What the
+  exercise settles is that the binding constraint is the assignment of policy to
+  nine regions rather than any missing structure: the structure was built, it
+  absorbs the confounds the simpler designs are exposed to, and the answer did
+  not improve.
+- `bootstrap_with_interval`, which pays for a design's decomposition once and
+  reads the estimate, its cluster-robust standard error, the bootstrap p-value
+  and the inverted interval off it. The three-way design carries 2,695 columns
+  against 12,077 rows, where the least-squares solve behind the standard error
+  alone cost about ten minutes a horizon; the estimation went from uncomputable
+  to twenty-two minutes. It also makes the estimate reported beside a p-value the
+  estimate that p-value was computed from by construction rather than by
+  coincidence. Every published figure of the other two designs is unchanged, and
+  a test pins the equivalence.
+- `build_absorbing_design`, generalising the design builder to any number of
+  factors. Beyond two the design is rank deficient by construction, since
+  region-time and category-time dummies both span the calendar-month main
+  effects; the pseudo-inverse resolves it without touching any identified
+  coefficient, and `joint_wald_test` gained a matching fallback reached only on
+  the singular case, so the two-factor designs keep the solve they were computed
+  with.
+- The production-to-consumption bridge, which is the last term the
+  region-by-category exposure needed. `ptmw build consumption-bridge` composes
+  it from Eurostat's use table and the concordance recorded in
+  `config/consumption_bridge.yaml`, and writes the labour shares and the
+  consumption vector alongside it. The bridge is moderately concentrated, at an
+  identifying spread of 2.31 percentage points against 2.22 for the moderate
+  simulation and 0.23 for the diffuse one, so the design the decision log gated
+  on this answer is worth estimating.
+- `pt_mw_inflation.data.supply_use`, reading household final consumption by CPA
+  product at basic prices and domestic uses. Both are arguments rather than
+  defaults and both change the answer: at purchasers' prices a good's retail
+  margin is credited to the industry that made it rather than the one that sold
+  it, and including imports credits Portuguese employment with costs incurred
+  abroad. It checks the accounting identity that domestic content, imported
+  content and product taxes reconstruct the published total, since the excluded
+  share is only meaningful if they do.
+- Confidence intervals obtained by inverting the wild cluster bootstrap test,
+  reported beside the $p$-value at every horizon of both estimated designs and
+  led with in the manuscript. A null $p$-value says only that zero survives;
+  the interval says what else does, which is what separates a design that found
+  no effect from one that could not have found any. The exposure design's
+  widest runs from -73.70 to 64.65, admitting full pass-through, sixty times
+  full pass-through, and the same magnitudes negative.
+- `invert_bootstrap_interval` widens its search when the interval runs past it,
+  rather than reporting the ends of the search as the ends of the interval. The
+  starting range is quoted in cluster-robust standard errors, which is exactly
+  the statistic this module exists because it cannot be trusted: at impact on
+  the regional design a $t$ of 8.2 carries a bootstrap $p$ of 0.23, so every
+  candidate within six standard errors survived and the search never reached
+  zero.
 
 ### Changed
 
+- **Published estimates: every bootstrap $p$-value may move by up to 0.016.**
+  Two draws of the enumerated sign space reproduce the observed statistic
+  exactly, and whether they were counted was previously decided by which way
+  the last bits of a floating-point comparison fell. They are now counted, and
+  the sign symmetry that guarantees they come in pairs is imposed rather than
+  recomputed. The regional design's bootstrap $p$-values move from
+  0.234/0.029/0.303/0.441/0.494/0.383/0.352 to
+  0.238/0.031/0.305/0.441/0.496/0.391/0.359 across horizons 0 to 24, and its
+  smallest Holm-adjusted value from 0.205 to 0.219. The exposure design's move
+  from 0.512/0.871/0.904/0.516/0.984/0.461/0.914 to
+  0.512/0.871/0.906/0.516/0.984/0.469/0.922. No conclusion changes: one horizon
+  still survives at five per cent before the Holm correction and none after it,
+  and the exposure design still rejects nothing.
 - Manuscript restructured around the long-run record. The paper now documents
   the statutory series built from primary law, the real erosion of the wage
   floor against productivity, and a negative identification result explaining
@@ -127,6 +200,29 @@ was.
 
 ### Fixed
 
+- `structural_exposure` records whether the bite it was given carried the share
+  of each group's employment the bite was measured on, and the builder warns
+  when it did not. The column is optional, and passing the bite as a bare column
+  rather than the full frame dropped it silently, turning the coverage weighting
+  off while looking identical to having asked for it. That is how
+  `docs/consumption_bridge_feasibility.py` came to report 2.31 points of
+  identifying spread against the pipeline's 1.92; the script now calls the
+  production builder, so there is one number and one code path.
+- `invert_bootstrap_interval` is fast enough to run in the pipeline, and is now
+  wired into it. It rebuilt the decomposition of a design carrying one dummy per
+  region-category and per month on every one of its candidate values, so a
+  seven-horizon path took roughly fifty minutes per design and was excluded from
+  `make paper`. The projection is now built once per horizon and reused, the
+  restricted fit comes from it by Frisch-Waugh instead of a second
+  least-squares solve of the reduced design, and the sign space is evaluated in
+  the cluster coordinates it actually occupies rather than one draw at a time.
+  A horizon's interval takes under two seconds; the bootstrap $p$-value alone
+  went from about ten seconds to under a third of one.
+- `write_regional_design_table` ignored its `command` argument and always named
+  `ptmw analyse pass-through`, so `exposure_design.tex` told the reader to
+  regenerate it with a command that does not produce it. This is the third
+  instance of that defect, and the second in a writer that took the argument and
+  dropped it; the existing regression test covered only the pre-trend writer.
 - The manuscript bibliography. Nothing in the paper cited anything, and the
   build ran a single LaTeX pass with no bibtex step, so the reference list was
   empty and the build still exited zero. `make paper` now runs the full cycle

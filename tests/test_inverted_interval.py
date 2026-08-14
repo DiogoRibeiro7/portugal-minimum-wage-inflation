@@ -13,6 +13,10 @@ import numpy as np
 import pytest
 
 from pt_mw_inflation.analysis.inference import (
+    _ClusterProjector,
+    _restricted_bootstrap,
+    _sign_vectors,
+    bootstrap_with_interval,
     invert_bootstrap_interval,
     wild_cluster_bootstrap,
 )
@@ -83,17 +87,57 @@ def test_a_wider_level_gives_a_wider_interval() -> None:
     assert wide.upper >= narrow.upper
 
 
-def test_an_interval_running_past_the_grid_says_so() -> None:
-    """Reporting a grid limit as an endpoint would understate the uncertainty.
+def test_an_interval_running_past_an_exhausted_search_says_so() -> None:
+    """Reporting a search limit as an endpoint would understate the uncertainty.
 
     A very narrow search cannot contain a wide interval, and silently returning
-    its own edges would read as precision the data does not support.
+    its own edges would read as precision the data does not support. With no
+    expansions left the search is exhausted, and the flag has to show it.
     """
     design, outcome, clusters = _clustered(seed=4, effect=0.0)
     interval = invert_bootstrap_interval(
-        design, outcome, clusters, target=0, span=0.05, grid_points=5, draws=99
+        design, outcome, clusters, target=0, span=0.05, grid_points=5, expansions=0, draws=99
     )
     assert not interval.bounded
+
+
+def test_a_narrow_search_widens_until_the_interval_closes() -> None:
+    """The starting range is a guess, and a wrong guess must not become the answer.
+
+    The range is quoted in cluster-robust standard errors, which is the statistic
+    this whole module exists because it cannot be trusted. Where it most
+    understates the uncertainty the interval is widest and the range built from
+    it is narrowest, so the search has to be able to correct itself.
+    """
+    design, outcome, clusters = _clustered(seed=4, effect=0.0)
+    exhausted = invert_bootstrap_interval(
+        design, outcome, clusters, target=0, span=0.05, grid_points=5, expansions=0, draws=99
+    )
+    widened = invert_bootstrap_interval(
+        design, outcome, clusters, target=0, span=0.05, grid_points=5, draws=99
+    )
+
+    assert widened.bounded
+    assert widened.lower < exhausted.lower
+    assert widened.upper > exhausted.upper
+
+
+def test_the_interval_at_zero_is_the_reported_test() -> None:
+    """The agreement is by shared implementation, not by shared definition.
+
+    A candidate of zero subtracts nothing, so inverting the test at that point
+    must run exactly the computation the reported p-value comes from. Testing it
+    on a design whose clustered standard error is badly understated is the case
+    where a second implementation would have drifted.
+    """
+    design, outcome, clusters = _clustered(seed=6, effect=1.4)
+    reported = wild_cluster_bootstrap(design, outcome, clusters, target=0, draws=199, seed=20260814)
+
+    projector = _ClusterProjector(design, np.unique(clusters, return_inverse=True)[1], 0)
+    signs, exhaustive = _sign_vectors(8, 199, np.random.default_rng(20260814))
+    *_, p_value = _restricted_bootstrap(projector, outcome, signs, exhaustive=exhaustive)
+
+    assert p_value == reported.p_value
 
 
 def test_an_impossible_level_is_refused() -> None:
@@ -108,3 +152,36 @@ def test_too_few_grid_points_are_refused() -> None:
     design, outcome, clusters = _clustered(seed=2, effect=0.0)
     with pytest.raises(ValueError, match="three grid points"):
         invert_bootstrap_interval(design, outcome, clusters, target=0, grid_points=2, draws=99)
+
+
+def test_sharing_the_projection_changes_no_number() -> None:
+    """One decomposition must give what four separate ones gave.
+
+    The estimator pays for the projection once and reads the estimate, its
+    standard error, the p-value and the interval off it. On the
+    region-by-category design that is the difference between minutes and an
+    hour per horizon, but it is only worth having if it is the same arithmetic,
+    so this compares it against the procedures run separately.
+    """
+    design, outcome, clusters = _clustered(seed=6, effect=1.4)
+
+    combined, bounds = bootstrap_with_interval(
+        design, outcome, clusters, target=0, draws=199, seed=4242
+    )
+    separate = wild_cluster_bootstrap(design, outcome, clusters, target=0, draws=199, seed=4242)
+    apart = invert_bootstrap_interval(design, outcome, clusters, target=0, draws=199, seed=4242)
+
+    assert combined == separate
+    assert bounds == apart
+
+
+def test_declining_the_interval_still_runs_the_test() -> None:
+    """A caller that wants only the p-value must not pay for the search."""
+    design, outcome, clusters = _clustered(seed=11, effect=0.8)
+
+    test, bounds = bootstrap_with_interval(
+        design, outcome, clusters, target=0, interval=False, draws=199
+    )
+
+    assert bounds is None
+    assert 0.0 < test.p_value <= 1.0

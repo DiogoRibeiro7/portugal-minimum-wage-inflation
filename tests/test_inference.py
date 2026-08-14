@@ -13,6 +13,7 @@ import pytest
 
 from pt_mw_inflation.analysis.inference import (
     _ClusterProjector,
+    _sign_vectors,
     clustered_t_statistic,
     detectable_effects,
     holm_adjusted,
@@ -109,6 +110,53 @@ def test_p_value_can_never_be_zero() -> None:
     result = wild_cluster_bootstrap(design, outcome, clusters, target=0)
     assert result.p_value >= 1.0 / (result.draws + 1)
     assert result.p_value > 0.0
+
+
+def test_the_enumerated_bootstrap_distribution_is_exactly_symmetric() -> None:
+    """Flipping every sign must flip the statistic and nothing else.
+
+    Under the restricted bootstrap the resampled statistic is odd in the sign
+    vector, so an enumerated sign space produces exact plus/minus pairs and half
+    as many distinct magnitudes as draws. This is not a decorative property: the
+    pair containing the all-positive vector is the one that reproduces the
+    observed statistic, and if rounding separates a pair the p-value moves by
+    whole draws. Computing the restricted fit's contribution rather than
+    imposing the zero it is defined to be did exactly that.
+    """
+    design, outcome, clusters = _clustered_sample(7, 20, effect=0.5, seed=21)
+    _, index = np.unique(clusters, return_inverse=True)
+    projector = _ClusterProjector(design, index, 0)
+    signs, exhaustive = _sign_vectors(7, 9999, np.random.default_rng(1))
+    assert exhaustive
+
+    statistics = projector.bootstrap_t_statistics(outcome, signs)
+
+    # Enumeration pairs each vector with its negation at the mirrored index.
+    mirrored = statistics[::-1]
+    assert np.array_equal(statistics, -mirrored)
+    assert np.unique(np.abs(statistics)).size == statistics.size // 2
+
+
+def test_the_observed_sample_counts_as_its_own_draw() -> None:
+    """The all-positive draw rebuilds the sample, so it cannot be rounded away.
+
+    With every sign positive the resampled outcome is the original outcome, so
+    that draw's statistic *is* the observed one and belongs in the tail. The two
+    are computed by different routes and agree only to rounding, so a bare
+    comparison decided it by the last bits.
+    """
+    design, outcome, clusters = _clustered_sample(7, 40, effect=50.0, seed=6)
+    _, index = np.unique(clusters, return_inverse=True)
+    projector = _ClusterProjector(design, index, 0)
+    signs, _ = _sign_vectors(7, 9999, np.random.default_rng(1))
+
+    _, _, observed = projector.fit(outcome)
+    statistics = projector.bootstrap_t_statistics(outcome, signs)
+
+    # A colossal effect puts every other draw far inside the observed statistic,
+    # so the tail is exactly the pair that reproduces it.
+    assert abs(statistics[-1]) == pytest.approx(abs(observed), rel=1e-9)
+    assert int(np.sum(np.abs(statistics) >= abs(observed) * (1 - 1e-6))) == 2
 
 
 def test_projector_matches_direct_estimation() -> None:
