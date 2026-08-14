@@ -41,12 +41,14 @@ check: lint typecheck test
 # has to run before LaTeX does.
 paper:
 	poetry run ptmw data download-sources
-	# Reports raw inputs whose bytes moved since the manifest was frozen.
+	poetry run ptmw data ine-cpi
+	poetry run ptmw data regional-employment
+	# Runs after every retrieval stage, not before them. Placed earlier it
+	# verified only the sources download-sources had fetched and reported the
+	# rest as missing, which is a check that cannot see what it is for.
 	# Not strict: an upstream revision should be seen and decided on, not
 	# silently block a rebuild.
 	poetry run ptmw data verify-inputs
-	poetry run ptmw data ine-cpi
-	poetry run ptmw data regional-employment
 	poetry run ptmw build minimum-wage
 	poetry run ptmw build macro
 	# The October 2015 round, and a window starting in 2016, so exposure

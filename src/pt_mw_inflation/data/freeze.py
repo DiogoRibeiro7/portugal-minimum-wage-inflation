@@ -17,6 +17,11 @@ than after a number in the manuscript has quietly shifted.
 The manifest is committed. The raw files are not: they are large, and several
 carry redistribution terms this project does not own. What is distributed is
 enough to detect drift, not enough to replace retrieval.
+
+Several responses embed the moment they were extracted. Digesting those bytes
+directly would report every input as changed on every run, which is not a
+warning but noise, and noise in a check like this trains its reader to ignore
+it. Those payloads are digested over their substantive content instead.
 """
 
 from __future__ import annotations
@@ -27,6 +32,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from pt_mw_inflation.data.http import sha256_bytes
+from pt_mw_inflation.data.ine import content_digest
 
 
 class FreezeError(RuntimeError):
@@ -85,7 +91,14 @@ def checksum_inputs(raw_root: Path) -> dict[str, str]:
         if not path.is_file() or path.name in _EXCLUDED_NAMES:
             continue
         relative = path.relative_to(raw_root.parent.parent).as_posix()
-        digests[relative] = sha256_bytes(path.read_bytes())
+        payload = path.read_bytes()
+        # Statistics Portugal stamps each response with its extraction time, so
+        # the raw bytes differ on every fetch while the data is identical.
+        # `content_digest` removes the stamp and falls back to the raw digest
+        # for anything that is not the expected JSON.
+        digests[relative] = (
+            content_digest(payload) if path.suffix == ".json" else sha256_bytes(payload)
+        )
     return dict(sorted(digests.items()))
 
 
