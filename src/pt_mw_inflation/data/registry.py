@@ -8,6 +8,7 @@ from pathlib import Path
 
 import requests
 import yaml
+from dataexcept import DataLoadingError, FileReadError, FileWriteError
 
 from pt_mw_inflation.data.http import SourceIntegrityError, download_source
 from pt_mw_inflation.schemas import DownloadRecord, SourceSpec
@@ -29,11 +30,15 @@ def load_source_registry(path: Path) -> dict[str, SourceSpec]:
         Validated specifications keyed by source identifier.
 
     Raises:
+        FileReadError: If the registry cannot be read.
         RegistryError: If the file has no sources, or if two sources would
             write to the same destination, which silently makes one of them
             unreachable.
     """
-    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    try:
+        payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise FileReadError(str(path), error) from error
     raw_sources = (payload or {}).get("sources")
     if not raw_sources:
         raise RegistryError(f"{path} defines no sources")
@@ -83,7 +88,7 @@ def download_registry(
                 continue
             try:
                 records.append(download_source(name, spec, root, session=session))
-            except (requests.RequestException, SourceIntegrityError) as error:
+            except (DataLoadingError, FileReadError, FileWriteError, SourceIntegrityError) as error:
                 failures.append(f"{name}: {error}")
 
     write_manifest(records, root)
@@ -106,12 +111,18 @@ def write_manifest(records: list[DownloadRecord], root: Path) -> Path:
 
     Returns:
         Path to the written manifest.
+
+    Raises:
+        FileWriteError: If the manifest directory or file cannot be written.
     """
     manifest_path = root / MANIFEST_PATH
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
     ordered = sorted(records, key=lambda record: record.source_name)
-    manifest_path.write_text(
-        json.dumps([record.model_dump(mode="json") for record in ordered], indent=2) + "\n",
-        encoding="utf-8",
-    )
+    try:
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest_path.write_text(
+            json.dumps([record.model_dump(mode="json") for record in ordered], indent=2) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as error:
+        raise FileWriteError(str(manifest_path), error) from error
     return manifest_path

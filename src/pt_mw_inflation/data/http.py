@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
+from dataexcept import DataLoadingError, FileReadError, FileWriteError
 
 from pt_mw_inflation.schemas import EXPECTED_MEDIA_TYPES, DownloadRecord, SourceSpec
 
@@ -26,9 +27,12 @@ class SourceIntegrityError(RuntimeError):
 def sha256_file(path: Path) -> str:
     """Return the SHA-256 digest of a file."""
     digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
+    try:
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as error:
+        raise FileReadError(str(path), error) from error
     return digest.hexdigest()
 
 
@@ -150,13 +154,21 @@ def download_source(
         A provenance record containing timestamp, size, media type and checksum.
 
     Raises:
-        requests.HTTPError: If the remote server returns a failed response.
+        DataLoadingError: If retrieval fails after the configured retries.
+        FileReadError: If an existing raw file cannot be checksummed.
+        FileWriteError: If a raw file or snapshot cannot be written.
         SourceIntegrityError: If the payload is not the declared kind of file.
     """
     destination = root / spec.destination
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        raise FileWriteError(str(destination), error) from error
 
-    response = fetch(str(spec.url), session=session)
+    try:
+        response = fetch(str(spec.url), session=session)
+    except requests.RequestException as error:
+        raise DataLoadingError(str(spec.url), error) from error
     media_type = verify_payload(name, spec, response)
 
     payload = response.content
@@ -181,11 +193,17 @@ def download_source(
             snapshot = destination.with_name(
                 f"{destination.stem}.{stamp}.{previous_digest[:12]}{destination.suffix}"
             )
-            destination.replace(snapshot)
+            try:
+                destination.replace(snapshot)
+            except OSError as error:
+                raise FileWriteError(str(snapshot), error) from error
             snapshot_path = snapshot.relative_to(root)
 
     if status != "unchanged":
-        destination.write_bytes(payload)
+        try:
+            destination.write_bytes(payload)
+        except OSError as error:
+            raise FileWriteError(str(destination), error) from error
 
     return DownloadRecord(
         source_name=name,
