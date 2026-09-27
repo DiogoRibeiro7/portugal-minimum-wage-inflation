@@ -217,6 +217,14 @@ poetry run ptmw analyse exposure-design
 poetry run ptmw analyse exposure-robustness
 ```
 
+The source download path uses [DataExcept](https://github.com/DiogoRibeiro7/DataExcept)
+for operational failures: `DataLoadingError` retains the underlying HTTP error,
+`FileReadError` identifies an unreadable local source or registry, and
+`FileWriteError` identifies a failed raw file, snapshot, or manifest write.
+Payload mismatches still raise `SourceIntegrityError` with the expected source
+kind and actual media type. A batch attempts all enabled sources and reports
+the failures together; a manifest write failure stops the batch.
+
 Everything above, plus the LaTeX build, runs as `make paper`. That target is
 verified to work from an empty tree.
 

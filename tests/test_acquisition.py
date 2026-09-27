@@ -6,18 +6,27 @@ All tests are offline: responses are constructed in the test, never fetched.
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from pathlib import Path
 
 import pytest
 import requests
+from dataexcept import DataLoadingError, FileReadError, FileWriteError
 
+from pt_mw_inflation.data import registry as registry_module
 from pt_mw_inflation.data.http import (
     SourceIntegrityError,
     download_source,
     sha256_bytes,
+    sha256_file,
     verify_payload,
 )
-from pt_mw_inflation.data.registry import RegistryError, load_source_registry, write_manifest
+from pt_mw_inflation.data.registry import (
+    RegistryError,
+    download_registry,
+    load_source_registry,
+    write_manifest,
+)
 from pt_mw_inflation.schemas import SourceSpec
 
 
@@ -90,11 +99,45 @@ def test_expected_media_type_passes() -> None:
 
 
 def test_failed_http_status_propagates(tmp_path: Path) -> None:
-    """A server error is raised rather than silently written to disk."""
+    """A failed source retains the HTTP error and does not write raw data."""
     session = FakeSession(*[FakeResponse(b"", XLSX_MEDIA, status_code=404)] * 3)
-    with pytest.raises(requests.HTTPError):
+    with pytest.raises(DataLoadingError) as caught:
         download_source("example", _spec(), tmp_path, session=session)  # type: ignore[arg-type]
+    assert caught.value.source == "https://example.invalid/book.xlsx"
+    assert isinstance(caught.value.original, requests.HTTPError)
+    assert caught.value.__cause__ is caught.value.original
     assert not (tmp_path / "data/raw/example/book.xlsx").exists()
+
+
+def test_unreadable_existing_source_reports_its_path(tmp_path: Path) -> None:
+    """Checksum failures identify the original source rather than the download URL."""
+    missing = tmp_path / "absent.xlsx"
+
+    with pytest.raises(FileReadError) as caught:
+        sha256_file(missing)
+
+    assert caught.value.path == str(missing)
+    assert isinstance(caught.value.__cause__, FileNotFoundError)
+
+
+def test_unwritable_raw_source_reports_its_destination(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A successful retrieval can still fail when persisting raw bytes."""
+    destination = tmp_path / "data/raw/example/book.xlsx"
+    original = OSError("read-only filesystem")
+
+    def fail_write(_path: Path, _payload: bytes) -> int:
+        raise original
+
+    monkeypatch.setattr(Path, "write_bytes", fail_write)
+    session = FakeSession(FakeResponse(b"PK\x03\x04payload", XLSX_MEDIA))
+
+    with pytest.raises(FileWriteError) as caught:
+        download_source("example", _spec(), tmp_path, session=session)  # type: ignore[arg-type]
+
+    assert caught.value.path == str(destination)
+    assert caught.value.__cause__ is original
 
 
 def test_first_download_records_provenance(tmp_path: Path) -> None:
@@ -178,6 +221,57 @@ def test_empty_registry_is_rejected(tmp_path: Path) -> None:
         load_source_registry(registry)
 
 
+def test_missing_registry_reports_its_path(tmp_path: Path) -> None:
+    """A missing configuration file is distinguishable from an empty registry."""
+    registry = tmp_path / "sources.yaml"
+    with pytest.raises(FileReadError) as caught:
+        load_source_registry(registry)
+
+    assert caught.value.path == str(registry)
+    assert isinstance(caught.value.__cause__, FileNotFoundError)
+
+
+def test_batch_keeps_successful_sources_after_a_download_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One unreachable source must not hide another source's provenance record."""
+    registry_path = tmp_path / "sources.yaml"
+    registry_path.write_text(
+        """sources:
+  unavailable:
+    provider: Example
+    kind: html
+    url: https://example.invalid/missing.html
+    destination: data/raw/missing.html
+    description: Unreachable source
+    minimum_bytes: 4
+  available:
+    provider: Example
+    kind: html
+    url: https://example.invalid/available.html
+    destination: data/raw/available.html
+    description: Available source
+    minimum_bytes: 4
+""",
+        encoding="utf-8",
+    )
+    session = FakeSession(
+        *[FakeResponse(b"", "text/html", status_code=404) for _ in range(3)],
+        FakeResponse(b"<html>available</html>", "text/html"),
+    )
+    monkeypatch.setattr(registry_module.requests, "Session", lambda: nullcontext(session))
+    monkeypatch.setattr("pt_mw_inflation.data.http.time.sleep", lambda _delay: None)
+
+    with pytest.raises(RuntimeError, match="1 of 2 sources failed") as caught:
+        download_registry(registry_path, tmp_path)
+
+    assert "DataLoadingError" in str(caught.value)
+    assert len(session.requested) == 4
+    assert (tmp_path / "data/raw/available.html").exists()
+    manifest = json.loads((tmp_path / "data/raw/source_manifest.json").read_text(encoding="utf-8"))
+    assert [record["source_name"] for record in manifest] == ["available"]
+
+
 def test_disabled_source_requires_a_reason() -> None:
     """A withdrawn source must document why it cannot be retrieved."""
     with pytest.raises(ValueError, match="unavailable_reason"):
@@ -205,6 +299,18 @@ def test_manifest_is_sorted_and_complete(tmp_path: Path) -> None:
         assert entry["sha256"] and entry["bytes"] > 0
         assert entry["retrieved_at_utc"].endswith("+00:00")
         assert entry["url"] and entry["provider"]
+
+
+def test_unwritable_manifest_reports_its_path(tmp_path: Path) -> None:
+    """A failed provenance write must not look like a completed download run."""
+    (tmp_path / "data").write_text("not a directory", encoding="utf-8")
+    manifest = tmp_path / "data/raw/source_manifest.json"
+
+    with pytest.raises(FileWriteError) as caught:
+        write_manifest([], tmp_path)
+
+    assert caught.value.path == str(manifest)
+    assert isinstance(caught.value.__cause__, OSError)
 
 
 def test_repository_registry_is_valid() -> None:

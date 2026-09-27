@@ -12,6 +12,11 @@ was.
 
 ## [Unreleased]
 
+### Added
+
+- DataExcept errors with chained causes for source downloads, local input reads,
+  and raw-file and provenance writes, without changing payload integrity checks.
+
 ## [0.3.0] - 2026-08-14
 
 Three designs are now estimated rather than argued about, and the paper's causal

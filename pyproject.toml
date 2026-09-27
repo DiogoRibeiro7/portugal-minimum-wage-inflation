@@ -3,7 +3,7 @@ name = "pt-minimum-wage-inflation"
 version = "0.3.0"
 description = "Reproducible empirical study of minimum wages, productivity and inflation in Portugal."
 readme = "README.md"
-requires-python = ">=3.12,<4.0"
+requires-python = ">=3.12,<3.15"
 license = "MIT"
 license-files = ["LICENSE", "LICENSE-CC-BY-4.0.txt"]
 authors = [{ name = "Diogo Ribeiro", email = "diogo_dj@hotmail.com" }]
@@ -25,6 +25,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "DataExcept>=1.7,<2.0",
     "pandas>=2.3,<3.0",
     "numpy>=2.2,<3.0",
     "requests>=2.32,<3.0",
