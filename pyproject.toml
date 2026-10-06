@@ -40,7 +40,7 @@ dependencies = [
     "linearmodels>=6.1,<7.0",
     "scipy>=1.15,<2.0",
     "matplotlib>=3.10,<4.0",
-    "pypdf (>=6.0,<7.0)",
+    "pypdf (>=6.19.0,<7.0)",
     "cryptography>=50.0,<51.0",
 ]
 
