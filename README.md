@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/project-avatar.png" alt="portugal-minimum-wage-inflation project logo" width="160" height="160">
+</p>
+
 # Portugal Minimum Wage Inflation
 
 [![CI](https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/actions/workflows/ci.yml/badge.svg)](https://github.com/DiogoRibeiro7/portugal-minimum-wage-inflation/actions/workflows/ci.yml)
