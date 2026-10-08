@@ -1,0 +1,7 @@
+Tool: built-in image generation
+
+Use case: logo-brand.
+Asset type: square project logo for portugal-minimum-wage-inflation.
+Project purpose: Reproducible empirical study of minimum wages, productivity and inflation in Portugal (1974-present).
+Design direction: A contemporary Portuguese azulejo tile identity: cobalt-blue ceramic brushwork on milk-white glaze, with a central ascending stair motif crossed by one thin red price ribbon. Four very simple traditional corner flourishes, restrained crackle texture. Bold readable tile pattern, frontal square composition; no coins, scales, flags, letters, or numbers.
+Composition: one finished square image, visually distinctive and readable at 160 pixels, with enough margin for README display. Produce the actual artwork, not a mockup sheet or brand presentation. No watermark. Do not use a navy-and-gold metallic badge aesthetic.
